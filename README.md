@@ -2,3 +2,4 @@
 - Bluesky: @misotrek.bsky.social
 - Mixi2: @misotrek
 - github: @misotrek
+- Zenn: @misotr
