@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Nostarium UI Mock</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #0b1d26;
+      overflow: hidden;
+      font-family: system-ui, sans-serif;
+      color: #cfe8f3;
+    }
+    canvas { display: block; }
+    .hint {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      opacity: 0.6;
+      font-size: 12px;
+    }
+
+    .ui {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      width: 340px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .panel {
+      pointer-events: auto;
+      max-width: 340px;
+      background: rgba(4, 18, 24, 0.55);
+      border: 1px solid rgba(160, 210, 230, 0.18);
+      border-radius: 12px;
+      padding: 10px 12px;
+      backdrop-filter: blur(6px);
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    label {
+      opacity: 0.8;
+      font-size: 12px;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(160, 210, 230, 0.22);
+      background: rgba(5, 16, 22, 0.55);
+      color: #cfe8f3;
+      outline: none;
+    }
+
+    select {
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(160, 210, 230, 0.22);
+      background: rgba(5, 16, 22, 0.55);
+      color: #cfe8f3;
+      outline: none;
+      min-width: 92px;
+    }
+
+    button {
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(160, 210, 230, 0.22);
+      background: rgba(5, 16, 22, 0.55);
+      color: #cfe8f3;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status {
+      margin-top: 8px;
+      font-size: 12px;
+      opacity: 0.85;
+    }
+
+    .small {
+      margin-top: 6px;
+      font-size: 11px;
+      opacity: 0.6;
+      line-height: 1.4;
+    }
+
+    .log {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(160, 210, 230, 0.12);
+      background: rgba(5, 16, 22, 0.35);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      line-height: 1.35;
+      max-height: 180px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      opacity: 0.9;
+    }
+
+    .feed {
+      pointer-events: auto;
+      width: 340px;
+      height: min(45vh, 420px);
+      background: rgba(4, 18, 24, 0.55);
+      border: 1px solid rgba(160, 210, 230, 0.18);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      backdrop-filter: blur(6px);
+    }
+
+    .feedTitle {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(160, 210, 230, 0.12);
+      font-size: 12px;
+      opacity: 0.85;
+    }
+
+    .feedList {
+      overflow: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .post {
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(160, 210, 230, 0.12);
+      background: rgba(5, 16, 22, 0.35);
+    }
+
+    .post .meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11px;
+      opacity: 0.75;
+      margin-bottom: 6px;
+    }
+
+    .post .content {
+      font-size: 12px;
+      opacity: 0.95;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    @media (max-width: 900px) {
+      .ui { width: calc(100vw - 24px); }
+      .feed { display: none; }
+    }
+  </style>
+</head>
+<body>
+<canvas id="tank"></canvas>
+<div class="hint">Nostarium mock — 魚 = 選択レンジ内に投稿したユーザ（Nostrリレー購読 / 読み取り専用）</div>
+
+<div class="ui" id="ui">
+  <div class="panel">
+    <div class="row">
+      <label for="relay">Relay</label>
+      <input id="relay" type="text" value="wss://yabu.me" spellcheck="false" />
+    </div>
+    <div class="row">
+      <label for="range">Range</label>
+      <select id="range">
+        <option value="600">10分</option>
+        <option value="1800">30分</option>
+        <option value="3600" selected>1時間</option>
+        <option value="7200">2時間</option>
+      </select>
+      <button id="btnConnect">Connect</button>
+      <button id="btnDisconnect" disabled>Disconnect</button>
+    </div>
+    <div class="status" id="status">disconnected</div>
+    <div class="small" id="version"></div>
+    <div class="small" id="activeCount"></div>
+    <div class="log" id="log"></div>
+    <div class="small">※ リレーは通常「最近の投稿」しか返しません。厳密な意味での「全履歴」は取得できない場合があります。</div>
+  </div>
+
+  <div class="feed" id="feed">
+    <div class="feedTitle">Posts (latest)</div>
+    <div class="feedList" id="feedList"></div>
+  </div>
+</div>
+<script>
+const APP_VERSION = '0.2.8';
+
+const canvas = document.getElementById('tank');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ---- Nostr 購読で魚（ユーザ）を生成 ----
+// ログイン不要：読み取り専用
+
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+// 表示用（フォールバック）のダミー
+const dummyPosts = [
+  '水槽UIのプロトタイプ進捗…🐠',
+  '今日は静かな海だ。',
+  'nostrの分散っぽさ、好き。',
+  '泡＝リアクション、って発想いいな',
+  '昼休みにちょっと潜る',
+  'タグの匂いで魚が集まるの面白い',
+  'UIは観測装置、という方向で',
+  'リレーは後でいい、まず体験',
+  '深海に長文を沈めたい',
+  '発光は勢いの可視化。'
+];
+
+const fishes = [];                  // 描画用（配列）
+const fishByPubkey = new Map();     // pubkey -> fish
+const profileCache = new Map();     // pubkey -> { name }
+
+function normalizePubkey(pubkey) {
+  return String(pubkey == null ? '' : pubkey).trim().toLowerCase();
+}
+
+function shortKey(pubkey) {
+  const p = normalizePubkey(pubkey);
+  if (!p) return 'unknown';
+  return p.slice(0, 8);
+}
+
+function ensureFish(pubkey) {
+  const pk = normalizePubkey(pubkey);
+  if (!pk) return null;
+
+  let f = fishByPubkey.get(pk);
+  if (f) return f;
+
+  f = {
+    pubkey: pk,
+    name: '@' + shortKey(pk),
+    latest: pick(dummyPosts),
+    x: (340 + 24) + Math.random() * Math.max(64, canvas.width - (340 + 24)),
+    y: Math.random() * canvas.height,
+    vx: (Math.random() - 0.5) * 0.7,
+    vy: (Math.random() - 0.5) * 0.45,
+    size: 9 + Math.random() * 10,
+    activity: 0.18 + Math.random() * 0.22,
+    hue: Math.random() * 360,
+    bubbleCooldown: 10 + Math.random() * 120,
+    lastSeen: Date.now()
+  };
+
+  fishes.push(f);
+  fishByPubkey.set(pk, f);
+
+  // プロフィール（kind 0）をまとめて取りにいく（REQを増やしすぎない）
+  enqueueProfile(pk);
+
+  updateActiveCount();
+  return f;
+}
+
+
+const bubbles = [];
+
+// ---- UI要素 ----
+const relayInput = document.getElementById('relay');
+var rangeSelect = document.getElementById('range');
+const btnConnect = document.getElementById('btnConnect');
+const btnDisconnect = document.getElementById('btnDisconnect');
+const statusEl = document.getElementById('status');
+const feedListEl = document.getElementById('feedList');
+
+const versionEl = document.getElementById('version');
+const logEl = document.getElementById('log');
+
+function log(line) {
+  const s = '[' + new Date().toLocaleTimeString() + '] ' + line;
+  if (logEl) {
+    logEl.textContent = (logEl.textContent ? (logEl.textContent + '\n') : '') + s;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+}
+
+// JSエラーも画面に出す（DevTools無しで原因がわかるように）
+window.addEventListener('error', (e) => {
+  log('JS ERROR: ' + (e.message || 'unknown'));
+});
+window.addEventListener('unhandledrejection', (e) => {
+  log('PROMISE REJECTION: ' + (e.reason && (e.reason.message || String(e.reason)) || 'unknown'));
+});
+
+if (versionEl) {
+  var build = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  versionEl.textContent = 'version ' + APP_VERSION + ' (build ' + build + ')';
+}
+log('ready');
+
+// 直近レンジ内に投稿したユーザ数（= 表示中の魚数）
+const activeCountEl = document.getElementById('activeCount');
+let ACTIVE_WINDOW_SEC = 3600;
+function readRangeSec() {
+  const v = Number(rangeSelect && rangeSelect.value);
+  return (Number.isFinite(v) && v > 0) ? v : 3600;
+}
+function updateActiveCount() {
+  if (activeCountEl) {
+    const mins = Math.round(ACTIVE_WINDOW_SEC / 60);
+    activeCountEl.textContent = 'active (last ' + mins + 'm): ' + fishes.length;
+  }
+}
+setInterval(updateActiveCount, 1000);
+updateActiveCount();
+
+// 送信REQ数/生存サブスク数（デバッグ用）
+let reqSent = 0;
+const activeSubs = new Set();
+
+function setStatus(text) {
+  const wsState = ws ? ws.readyState : 'null';
+  const extra = ' | REQ sent: ' + reqSent +
+    ' | active subs: ' + activeSubs.size +
+    ' | ws: ' + wsState +
+    ' | pendingProfiles: ' + pendingProfiles.size +
+    ' | profileInFlight: ' + (profileInFlight ? '1' : '0');
+  statusEl.textContent = text + extra;
+}
+
+// ---- Nostr 通信（読み取り専用） ----
+let ws = null;
+let subId = null;
+let profileSubPrefix = null;
+const seenEventIds = new Set();
+
+function randId(prefix) {
+  const p = prefix || 'sub';
+  return p + '_' + Math.random().toString(16).slice(2) + '_' + Date.now().toString(16);
+}
+
+function connectRelay(url) {
+  disconnectRelay();
+
+  ACTIVE_WINDOW_SEC = readRangeSec();
+  updateActiveCount();
+
+  setStatus('connecting: ' + url);
+  log('WS connect -> ' + url);
+  ws = new WebSocket(url);
+
+  ws.onopen = () => {
+    log('WS opened');
+
+    // プロフィール取得キューを初期化（過去の失敗状態を引きずらない）
+    pendingProfiles.clear();
+    requestedProfiles.clear();
+    profileInFlight = false;
+    currentProfileSubId = null;
+    if (profileTimer) {
+      clearTimeout(profileTimer);
+      profileTimer = null;
+    }
+    btnConnect.disabled = true;
+    btnDisconnect.disabled = false;
+
+    setStatus('connected: ' + url);
+
+    // メイン購読：kind 1（ノート）
+    // 重要：多くのリレーは「最近の一定数」しか返しません。
+    subId = randId('posts');
+    const now = Math.floor(Date.now() / 1000);
+    const since = now - ACTIVE_WINDOW_SEC;
+    const filter = { kinds: [1], since: since, limit: 200 };
+    {
+    const payload = ['REQ', subId, filter];
+    log('SEND ' + JSON.stringify(payload));
+    ws.send(JSON.stringify(payload));
+  }
+    reqSent++;
+    activeSubs.add(subId);
+
+    // すでに魚が溜まっている場合に備えて、プロフィール取得を再開
+    scheduleProfileFetch();
+
+    profileSubPrefix = randId('profile');
+  };
+
+  ws.onmessage = (ev) => {
+    log('RECV ' + String(ev.data).slice(0, 220));
+    let msg;
+    try { msg = JSON.parse(ev.data); }
+    catch { return; }
+
+    const type = msg[0];
+
+    if (type === 'NOTICE') {
+      setStatus('notice: ' + msg[1]);
+      return;
+    }
+
+    if (type === 'EOSE') {
+      // End Of Stored Events
+      const sid = msg[1];
+
+      // プロフィールのバッチ取得が終わったらCLOSEして次へ
+      if (sid && sid === currentProfileSubId) {
+        try {
+          {
+          const payload = ['CLOSE', currentProfileSubId];
+          log('SEND ' + JSON.stringify(payload));
+          ws.send(JSON.stringify(payload));
+        }
+          activeSubs.delete(currentProfileSubId);
+        } catch {}
+        currentProfileSubId = null;
+        profileInFlight = false;
+
+        if (pendingProfiles.size > 0) scheduleProfileFetch();
+      }
+      return;
+    }
+
+    if (type === 'EVENT') {
+      const sid = msg[1];
+      const event = msg[2];
+      if (!event || !event.id) return;
+      if (seenEventIds.has(event.id)) return;
+      seenEventIds.add(event.id);
+
+      if (event.kind === 1) {
+        handleNoteEvent(event);
+        return;
+      }
+
+      if (event.kind === 0) {
+        handleProfileEvent(event, sid);
+        return;
+      }
+    }
+  };
+
+  ws.onclose = () => {
+    log('WS closed');
+    btnConnect.disabled = false;
+    btnDisconnect.disabled = true;
+    setStatus('disconnected');
+    ws = null;
+    subId = null;
+    profileSubPrefix = null;
+
+    // プロフィール取得状態もリセット
+    profileInFlight = false;
+    currentProfileSubId = null;
+    if (profileTimer) {
+      clearTimeout(profileTimer);
+      profileTimer = null;
+    }
+    activeSubs.clear();
+  };
+
+  ws.onerror = () => {
+    log('WS error');
+    setStatus('error');
+  };
+}
+
+function disconnectRelay() {
+  if (ws) {
+    try {
+      if (subId) {
+        {
+        const payload = ['CLOSE', subId];
+        log('SEND ' + JSON.stringify(payload));
+        ws.send(JSON.stringify(payload));
+      }
+        activeSubs.delete(subId);
+      }
+      if (currentProfileSubId) {
+        {
+        const payload = ['CLOSE', currentProfileSubId];
+        log('SEND ' + JSON.stringify(payload));
+        ws.send(JSON.stringify(payload));
+      }
+        activeSubs.delete(currentProfileSubId);
+      }
+    } catch {}
+    try { ws.close(); } catch {}
+  }
+}
+
+btnConnect.addEventListener('click', () => {
+  ACTIVE_WINDOW_SEC = readRangeSec();
+  updateActiveCount();
+  const url = relayInput.value.trim();
+  if (!url) return;
+  connectRelay(url);
+});
+
+if (rangeSelect) {
+  rangeSelect.addEventListener('change', () => {
+    ACTIVE_WINDOW_SEC = readRangeSec();
+    updateActiveCount();
+    // 接続中なら再接続して since を反映
+    if (ws && ws.readyState === 1) {
+      const url = relayInput.value.trim();
+      if (url) connectRelay(url);
+    }
+  });
+}
+
+btnDisconnect.addEventListener('click', () => {
+  disconnectRelay();
+});
+
+// ---- イベント処理 ----
+function nowSec() { return Math.floor(Date.now() / 1000); }
+
+function handleNoteEvent(e) {
+  const f = ensureFish(e.pubkey);
+  if (!f) return;
+  f.latest = sanitizeOneLine(e.content);
+  f.lastSeen = Date.now();
+
+  f.activity = Math.min(1, f.activity + 0.18);
+  f.size = Math.min(30, f.size + 0.25);
+
+  bubbles.push({ x: f.x, y: f.y - f.size, r: 2 + Math.random() * 2.5, life: 140 });
+
+  addPostToFeed(e);
+}
+
+function handleProfileEvent(e, sid) {
+  // まとめREQでは、EOSE側でCLOSEするのでここでは閉じない
+  try {
+    const obj = JSON.parse(e.content || '{}');
+    const name = obj.display_name || obj.name || null;
+    if (!name) return;
+
+    const pk = normalizePubkey(e.pubkey);
+    profileCache.set(pk, { name: name });
+    log('PROFILE ' + pk.slice(0,8) + ' -> @' + name);
+    const f = fishByPubkey.get(pk);
+    if (f) f.name = '@' + name;
+  } catch {
+    // ignore
+  }
+}
+
+// ---- プロフィール取得（まとめREQ方式） ----
+const pendingProfiles = new Set();
+const requestedProfiles = new Set();
+let profileTimer = null;
+let profileInFlight = false;
+let currentProfileSubId = null;
+
+function enqueueProfile(pubkey) {
+  const pk = normalizePubkey(pubkey);
+  if (!pk) return;
+
+  // 旧実装の名残で profileCache に {name:null} が残っていても取得を止めない
+  const cached = profileCache.get(pk);
+  if (cached && cached.name) return;
+
+  if (requestedProfiles.has(pk)) return;
+  requestedProfiles.add(pk);
+  pendingProfiles.add(pk);
+  scheduleProfileFetch();
+}
+
+function scheduleProfileFetch() {
+  if (!ws || ws.readyState !== 1) return;
+  if (profileInFlight) return;
+  if (pendingProfiles.size === 0) return;
+  if (profileTimer) return;
+
+  profileTimer = setTimeout(() => {
+    profileTimer = null;
+    fetchProfilesBatch();
+  }, 400);
+}
+
+function fetchProfilesBatch() {
+  if (!ws || ws.readyState !== 1) return;
+  if (profileInFlight) return;
+  if (pendingProfiles.size === 0) return;
+
+  const authors = Array.from(pendingProfiles).slice(0, 50);
+  authors.forEach(pk => pendingProfiles.delete(pk));
+
+  currentProfileSubId = randId('profiles');
+  profileInFlight = true;
+
+  const filter = { kinds: [0], authors: authors, limit: authors.length };
+  try {
+    ws.send(JSON.stringify(['REQ', currentProfileSubId, filter]));
+    reqSent++;
+    activeSubs.add(currentProfileSubId);
+
+    // まれにEOSEが来ないリレー対策：一定時間で強制CLOSE
+    setTimeout(() => {
+      if (ws && ws.readyState === 1 && currentProfileSubId && profileInFlight) {
+        try {
+          ws.send(JSON.stringify(['CLOSE', currentProfileSubId]));
+          activeSubs.delete(currentProfileSubId);
+        } catch {}
+        currentProfileSubId = null;
+        profileInFlight = false;
+        if (pendingProfiles.size > 0) scheduleProfileFetch();
+      }
+    }, 2500);
+  }
+  catch {
+    profileInFlight = false;
+    currentProfileSubId = null;
+  }
+}
+
+function sanitizeOneLine(s) {
+  const t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+  return t || '(empty)';
+}
+
+function addPostToFeed(e) {
+  const el = document.createElement('div');
+  el.className = 'post';
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+
+  const left = document.createElement('div');
+  const f = fishByPubkey.get(normalizePubkey(e.pubkey));
+  const who = f ? f.name : '@' + shortKey(e.pubkey);
+  left.textContent = who;
+
+  const right = document.createElement('div');
+  const dt = new Date(((e.created_at || nowSec()) * 1000));
+  right.textContent = dt.toLocaleString();
+
+  meta.appendChild(left);
+  meta.appendChild(right);
+
+  const content = document.createElement('div');
+  content.className = 'content';
+  content.textContent = e.content || '';
+
+  el.appendChild(meta);
+  el.appendChild(content);
+
+  feedListEl.prepend(el);
+
+  const max = 120;
+  while (feedListEl.children.length > max) {
+    feedListEl.removeChild(feedListEl.lastChild);
+  }
+}
+
+// 起動時は自動接続しない（誤爆防止）
+
+// ---- テキスト描画の小道具 ----
+function roundRect(ctx, x, y, w, h, r) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+function ellipsize(text, maxWidth, ctx) {
+  // すでに収まるならそのまま
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  const ell = '…';
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const s = text.slice(0, mid) + ell;
+    if (ctx.measureText(s).width <= maxWidth) lo = mid + 1;
+    else hi = mid;
+  }
+  const n = Math.max(0, lo - 1);
+  return text.slice(0, n) + ell;
+}
+
+
+function update() {
+  const now = Date.now();
+
+  // 直近1時間を過ぎた魚は取り除く（= 表示数が“直近1時間のユーザ数”と一致する）
+  for (let i = fishes.length - 1; i >= 0; i--) {
+    const f = fishes[i];
+    const age = now - (f.lastSeen || 0);
+    if (age > ACTIVE_WINDOW_SEC * 1000) {
+      fishByPubkey.delete(f.pubkey);
+      fishes.splice(i, 1);
+    }
+  }
+
+  // 動き・泡
+  for (const f of fishes) {
+    f.x += f.vx;
+    f.y += f.vy;
+
+    const SAFE_LEFT = 340 + 24;
+    if (f.x < SAFE_LEFT || f.x > canvas.width) f.vx *= -1;
+    if (f.y < 0 || f.y > canvas.height) f.vy *= -1;
+
+    // 活動度はゆっくり減衰
+    f.activity = Math.max(0, f.activity - 0.0008);
+
+    f.bubbleCooldown--;
+    if (f.bubbleCooldown <= 0) {
+      bubbles.push({ x: f.x, y: f.y - f.size, r: 2 + Math.random() * 2, life: 120 });
+      const base = 70 + Math.random() * 140;
+      const boost = (1 - f.activity) * 80;
+      f.bubbleCooldown = base + boost;
+    }
+  }
+
+  for (const b of bubbles) {
+    b.y -= 0.3;
+    b.life--;
+  }
+
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    if (bubbles[i].life <= 0) bubbles.splice(i, 1);
+  }
+
+  updateActiveCount();
+}
+
+function drawFish(f) {
+  ctx.save();
+  ctx.translate(f.x, f.y);
+
+  // 向き（速度ベクトルからざっくり）
+  const dir = Math.sign(f.vx || 1);
+  ctx.scale(dir, 1);
+
+  // 発光（活動度）
+  ctx.shadowBlur = 10 * f.activity;
+  ctx.shadowColor = `hsla(${f.hue}, 80%, 60%, 0.6)`;
+
+  // 体
+  ctx.fillStyle = `hsla(${f.hue}, 70%, 55%, 0.9)`;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, f.size * 1.6, f.size, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 尾
+  ctx.beginPath();
+  ctx.moveTo(-f.size * 1.6, 0);
+  ctx.lineTo(-f.size * 2.2, f.size * 0.6);
+  ctx.lineTo(-f.size * 2.2, -f.size * 0.6);
+  ctx.closePath();
+  ctx.fill();
+
+  // 目
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(10,20,25,0.8)';
+  ctx.beginPath();
+  ctx.arc(f.size * 0.9, -f.size * 0.15, Math.max(1.4, f.size * 0.18), 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // --- ラベル（ユーザ名 + 最新投稿） ---
+  // 魚の外側に描く（scale/rotateの影響を受けないように別描画）
+  const pad = 6;
+  const name = f.name;
+  const latest = f.latest;
+
+  ctx.save();
+
+  // 文字サイズは魚サイズに軽く追従
+  const fontSize = Math.round(11 + Math.min(4, f.size * 0.15));
+  ctx.font = `${fontSize}px system-ui, sans-serif`;
+
+  // 2行（名前 + 投稿）
+  const maxWidth = Math.min(320, Math.max(180, canvas.width * 0.28));
+  const postLine = ellipsize(latest, maxWidth, ctx);
+  const nameW = ctx.measureText(name).width;
+  const postW = ctx.measureText(postLine).width;
+  const boxW = Math.min(maxWidth, Math.max(nameW, postW)) + pad * 2;
+  const lineH = fontSize + 4;
+  const boxH = lineH * 2 + pad * 2;
+
+  // 位置（魚の少し上）
+  let bx = f.x - boxW / 2;
+  let by = f.y - (f.size * 2.2) - boxH;
+
+  // 画面外にはみ出さないようにクランプ
+  bx = Math.max(8, Math.min(canvas.width - boxW - 8, bx));
+  by = Math.max(8, Math.min(canvas.height - boxH - 8, by));
+
+  // 背景（ほんのり）
+  ctx.fillStyle = 'rgba(4, 18, 24, 0.55)';
+  roundRect(ctx, bx, by, boxW, boxH, 10);
+  ctx.fill();
+
+  // 枠線
+  ctx.strokeStyle = `hsla(${f.hue}, 55%, 70%, 0.25)`;
+  ctx.lineWidth = 1;
+  roundRect(ctx, bx + 0.5, by + 0.5, boxW - 1, boxH - 1, 10);
+  ctx.stroke();
+
+  // テキスト
+  ctx.fillStyle = 'rgba(210, 235, 245, 0.95)';
+  ctx.fillText(name, bx + pad, by + pad + lineH - 6);
+
+  ctx.fillStyle = 'rgba(190, 220, 235, 0.85)';
+  ctx.fillText(postLine, bx + pad, by + pad + lineH * 2 - 6);
+
+  ctx.restore();
+}
+
+function drawBubble(b) {
+  ctx.strokeStyle = `rgba(200,220,255,${b.life / 120})`;
+  ctx.beginPath();
+  ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 水のグラデーション
+  const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  g.addColorStop(0, '#0b1d26');
+  g.addColorStop(1, '#082029');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (const b of bubbles) drawBubble(b);
+  for (const f of fishes) drawFish(f);
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+// ---- Fish click -> nostter profile ----
+canvas.addEventListener('click', (ev) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = ev.clientX - rect.left;
+  const y = ev.clientY - rect.top;
+
+  // 左のUI領域は誤爆防止で無視
+  if (x < 340 + 24) return;
+
+  for (let i = fishes.length - 1; i >= 0; i--) {
+    const f = fishes[i];
+    const dx = x - f.x;
+    const dy = y - f.y;
+    const r = f.size * 1.8;
+    if (dx * dx + dy * dy <= r * r) {
+      const npub = toNpub(f.pubkey);
+      if (npub) {
+        const url = 'https://nostter.app/' + npub;
+        log('OPEN ' + url);
+        window.open(url, '_blank', 'noopener');
+      } else {
+        log('npub convert failed: ' + f.pubkey);
+      }
+      return;
+    }
+  }
+});
+
+// ---- Minimal NIP-19 npub encoder ----
+function hexToBytes(hex) {
+  const h = String(hex || '').trim();
+  if (h.length % 2 !== 0) return null;
+  const out = new Uint8Array(h.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    const v = parseInt(h.slice(i * 2, i * 2 + 2), 16);
+    if (!Number.isFinite(v)) return null;
+    out[i] = v;
+  }
+  return out;
+}
+
+function convertBits(data, from, to, pad) {
+  let acc = 0;
+  let bits = 0;
+  const ret = [];
+  const maxv = (1 << to) - 1;
+  for (let i = 0; i < data.length; i++) {
+    const value = data[i];
+    if (value < 0 || (value >> from) !== 0) return null;
+    acc = (acc << from) | value;
+    bits += from;
+    while (bits >= to) {
+      bits -= to;
+      ret.push((acc >> bits) & maxv);
+    }
+  }
+  if (pad) {
+    if (bits > 0) ret.push((acc << (to - bits)) & maxv);
+  } else {
+    if (bits >= from) return null;
+    if (((acc << (to - bits)) & maxv) !== 0) return null;
+  }
+  return ret;
+}
+
+var BECH32_ALPHABET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+
+function bech32Polymod(values) {
+  const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+  let chk = 1;
+  for (let p = 0; p < values.length; p++) {
+    const top = chk >> 25;
+    chk = ((chk & 0x1ffffff) << 5) ^ values[p];
+    for (let i = 0; i < 5; i++) {
+      if ((top >> i) & 1) chk ^= GEN[i];
+    }
+  }
+  return chk;
+}
+
+function bech32HrpExpand(hrp) {
+  const ret = [];
+  for (let i = 0; i < hrp.length; i++) ret.push(hrp.charCodeAt(i) >> 5);
+  ret.push(0);
+  for (let i = 0; i < hrp.length; i++) ret.push(hrp.charCodeAt(i) & 31);
+  return ret;
+}
+
+function bech32CreateChecksum(hrp, data) {
+  const values = bech32HrpExpand(hrp).concat(data).concat([0, 0, 0, 0, 0, 0]);
+  const mod = bech32Polymod(values) ^ 1;
+  const ret = [];
+  for (let p = 0; p < 6; p++) ret.push((mod >> (5 * (5 - p))) & 31);
+  return ret;
+}
+
+function bech32Encode(hrp, data) {
+  const combined = data.concat(bech32CreateChecksum(hrp, data));
+  let out = hrp + '1';
+  for (let i = 0; i < combined.length; i++) out += BECH32_ALPHABET[combined[i]];
+  return out;
+}
+
+function toNpub(hexPubkey) {
+  const bytes = hexToBytes(hexPubkey);
+  if (!bytes) return null;
+  const five = convertBits(Array.from(bytes), 8, 5, true);
+  if (!five) return null;
+  return bech32Encode('npub', five);
+}
+
+loop();
+</script>
+</body>
+</html>
