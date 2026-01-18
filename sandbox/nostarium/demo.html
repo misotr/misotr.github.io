@@ -1,58 +1,85 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>Nostarium UI Mock</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Nostarium</title>
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #0b1d26;
-      overflow: hidden;
-      font-family: system-ui, sans-serif;
-      color: #cfe8f3;
-    }
-    canvas { display: block; }
-    .hint {
-      position: absolute;
-      left: 12px;
-      bottom: 12px;
-      opacity: 0.6;
-      font-size: 12px;
+    :root {
+      --panel-w: 340px;
+      --panel-gap: 10px;
+      --panel-pad: 12px;
+      --safe-left: calc(var(--panel-w) + var(--panel-pad) + 12px);
     }
 
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #06131a;
+      overflow: hidden;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      color: #cfe8f3;
+    }
+
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+
+    /* Left fixed UI stack (must not overlap fish area by design) */
     .ui {
       position: absolute;
-      left: 12px;
-      top: 12px;
-      width: 340px;
+      left: var(--panel-pad);
+      top: var(--panel-pad);
+      width: var(--panel-w);
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: var(--panel-gap);
       pointer-events: none;
       z-index: 10;
     }
 
     .panel {
       pointer-events: auto;
-      max-width: 340px;
-      background: rgba(4, 18, 24, 0.55);
+      border-radius: 14px;
+      background: rgba(7, 22, 30, 0.72);
       border: 1px solid rgba(160, 210, 230, 0.18);
-      border-radius: 12px;
+      box-shadow: 0 12px 35px rgba(0,0,0,0.35);
       padding: 10px 12px;
-      backdrop-filter: blur(6px);
+      backdrop-filter: blur(8px);
+    }
+
+    .title {
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.2px;
+      margin: 0 0 8px 0;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .small {
+      font-size: 12px;
+      opacity: 0.9;
+      line-height: 1.4;
     }
 
     .row {
       display: flex;
       align-items: center;
       gap: 8px;
+      margin: 6px 0;
     }
 
     label {
-      opacity: 0.8;
       font-size: 12px;
+      opacity: 0.9;
+      min-width: 48px;
     }
 
     input {
@@ -80,907 +107,1176 @@
       padding: 8px 10px;
       border-radius: 10px;
       border: 1px solid rgba(160, 210, 230, 0.22);
-      background: rgba(5, 16, 22, 0.55);
+      background: rgba(20, 70, 90, 0.35);
       color: #cfe8f3;
       cursor: pointer;
+      font-weight: 600;
     }
 
     button:disabled {
-      opacity: 0.5;
+      opacity: 0.55;
       cursor: not-allowed;
     }
 
-    .status {
-      margin-top: 8px;
+    .hint {
       font-size: 12px;
       opacity: 0.85;
-    }
-
-    .small {
-      margin-top: 6px;
-      font-size: 11px;
-      opacity: 0.6;
-      line-height: 1.4;
+      margin-top: 8px;
     }
 
     .log {
-      margin-top: 8px;
-      padding: 8px 10px;
-      border-radius: 10px;
-      border: 1px solid rgba(160, 210, 230, 0.12);
-      background: rgba(5, 16, 22, 0.35);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 11px;
-      line-height: 1.35;
-      max-height: 180px;
-      overflow: auto;
       white-space: pre-wrap;
       word-break: break-word;
-      opacity: 0.9;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(160, 210, 230, 0.14);
+      border-radius: 10px;
+      padding: 8px;
+      max-height: 170px;
+      overflow: auto;
     }
 
     .feed {
-      pointer-events: auto;
-      width: 340px;
-      height: min(45vh, 420px);
-      background: rgba(4, 18, 24, 0.55);
-      border: 1px solid rgba(160, 210, 230, 0.18);
-      border-radius: 12px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      backdrop-filter: blur(6px);
-    }
-
-    .feedTitle {
-      padding: 10px 12px;
-      border-bottom: 1px solid rgba(160, 210, 230, 0.12);
       font-size: 12px;
-      opacity: 0.85;
-    }
-
-    .feedList {
+      max-height: 380px;
       overflow: auto;
-      padding: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .post {
-      padding: 8px 10px;
       border-radius: 10px;
-      border: 1px solid rgba(160, 210, 230, 0.12);
-      background: rgba(5, 16, 22, 0.35);
+      border: 1px solid rgba(160, 210, 230, 0.14);
+      background: rgba(0,0,0,0.18);
     }
 
-    .post .meta {
+    .feedItem {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(160, 210, 230, 0.10);
+    }
+    .feedItem:last-child { border-bottom: 0; }
+
+    .feedTop {
       display: flex;
-      justify-content: space-between;
       gap: 8px;
-      font-size: 11px;
-      opacity: 0.75;
-      margin-bottom: 6px;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 4px;
     }
 
-    .post .content {
-      font-size: 12px;
-      opacity: 0.95;
-      line-height: 1.35;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
+    .feedName { font-weight: 700; }
+    .feedTime { opacity: 0.8; font-size: 11px; }
 
     @media (max-width: 900px) {
       .ui { width: calc(100vw - 24px); }
-      .feed { display: none; }
+      .postsPanel { display: none; }
     }
   </style>
 </head>
 <body>
-<canvas id="tank"></canvas>
-<div class="hint">Nostarium mock — 魚 = 選択レンジ内に投稿したユーザ（Nostrリレー購読 / 読み取り専用）</div>
+  <canvas id="tank"></canvas>
 
-<div class="ui" id="ui">
-  <div class="panel">
-    <div class="row">
-      <label for="relay">Relay</label>
-      <input id="relay" type="text" value="wss://yabu.me" spellcheck="false" />
+  <div class="ui">
+    <div class="panel">
+      <div class="title">
+        <span>Relay</span>
+        <span class="small" id="version"></span>
+      </div>
+
+      <div class="row">
+        <label for="relay">Relay</label>
+        <input id="relay" type="text" value="wss://yabu.me" spellcheck="false" />
+      </div>
+
+      <div class="row">
+        <label for="range">Range</label>
+        <select id="range">
+          <option value="600" selected>10分</option>
+          <option value="1800">30分</option>
+          <option value="3600">1時間</option>
+          <option value="7200">2時間</option>
+        </select>
+        <button id="btnConnect">Connect</button>
+        <button id="btnDisconnect" disabled>Disconnect</button>
+      </div>
+
+      <div class="small" id="status"></div>
+      <div class="small" id="activeCount"></div>
+
+      <div class="hint">Nostarium mock — 魚 = 選択レンジ内に投稿したユーザ（Nostrリレー購読 / 読み取り専用）</div>
+      <div class="log" id="log"></div>
     </div>
-    <div class="row">
-      <label for="range">Range</label>
-      <select id="range">
-        <option value="600">10分</option>
-        <option value="1800">30分</option>
-        <option value="3600" selected>1時間</option>
-        <option value="7200">2時間</option>
-      </select>
-      <button id="btnConnect">Connect</button>
-      <button id="btnDisconnect" disabled>Disconnect</button>
+
+    <div class="panel postsPanel">
+      <div class="title">
+        <span>Posts</span>
+        <span class="small" id="postStats"></span>
+      </div>
+      <div class="feed" id="feed"></div>
     </div>
-    <div class="status" id="status">disconnected</div>
-    <div class="small" id="version"></div>
-    <div class="small" id="activeCount"></div>
-    <div class="log" id="log"></div>
-    <div class="small">※ リレーは通常「最近の投稿」しか返しません。厳密な意味での「全履歴」は取得できない場合があります。</div>
   </div>
 
-  <div class="feed" id="feed">
-    <div class="feedTitle">Posts (latest)</div>
-    <div class="feedList" id="feedList"></div>
-  </div>
-</div>
-<script>
-const APP_VERSION = '0.2.8';
+  <script>
+    // ---- Version ----
+    const APP_VERSION = '0.3.4';
 
-const canvas = document.getElementById('tank');
-const ctx = canvas.getContext('2d');
+    // ---- DOM ----
+    const canvas = document.getElementById('tank');
+    const ctx = canvas.getContext('2d');
 
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-window.addEventListener('resize', resize);
-resize();
+    const relayInput = document.getElementById('relay');
+    const rangeSelect = document.getElementById('range');
+    const btnConnect = document.getElementById('btnConnect');
+    const btnDisconnect = document.getElementById('btnDisconnect');
 
-// ---- Nostr 購読で魚（ユーザ）を生成 ----
-// ログイン不要：読み取り専用
+    const statusEl = document.getElementById('status');
+    const versionEl = document.getElementById('version');
+    const activeCountEl = document.getElementById('activeCount');
+    const logEl = document.getElementById('log');
 
-function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+    const feedEl = document.getElementById('feed');
+    const postStatsEl = document.getElementById('postStats');
 
-// 表示用（フォールバック）のダミー
-const dummyPosts = [
-  '水槽UIのプロトタイプ進捗…🐠',
-  '今日は静かな海だ。',
-  'nostrの分散っぽさ、好き。',
-  '泡＝リアクション、って発想いいな',
-  '昼休みにちょっと潜る',
-  'タグの匂いで魚が集まるの面白い',
-  'UIは観測装置、という方向で',
-  'リレーは後でいい、まず体験',
-  '深海に長文を沈めたい',
-  '発光は勢いの可視化。'
-];
+    // ---- Helpers ----
+    function nowMs() { return Date.now(); }
 
-const fishes = [];                  // 描画用（配列）
-const fishByPubkey = new Map();     // pubkey -> fish
-const profileCache = new Map();     // pubkey -> { name }
-
-function normalizePubkey(pubkey) {
-  return String(pubkey == null ? '' : pubkey).trim().toLowerCase();
-}
-
-function shortKey(pubkey) {
-  const p = normalizePubkey(pubkey);
-  if (!p) return 'unknown';
-  return p.slice(0, 8);
-}
-
-function ensureFish(pubkey) {
-  const pk = normalizePubkey(pubkey);
-  if (!pk) return null;
-
-  let f = fishByPubkey.get(pk);
-  if (f) return f;
-
-  f = {
-    pubkey: pk,
-    name: '@' + shortKey(pk),
-    latest: pick(dummyPosts),
-    x: (340 + 24) + Math.random() * Math.max(64, canvas.width - (340 + 24)),
-    y: Math.random() * canvas.height,
-    vx: (Math.random() - 0.5) * 0.7,
-    vy: (Math.random() - 0.5) * 0.45,
-    size: 9 + Math.random() * 10,
-    activity: 0.18 + Math.random() * 0.22,
-    hue: Math.random() * 360,
-    bubbleCooldown: 10 + Math.random() * 120,
-    lastSeen: Date.now()
-  };
-
-  fishes.push(f);
-  fishByPubkey.set(pk, f);
-
-  // プロフィール（kind 0）をまとめて取りにいく（REQを増やしすぎない）
-  enqueueProfile(pk);
-
-  updateActiveCount();
-  return f;
-}
-
-
-const bubbles = [];
-
-// ---- UI要素 ----
-const relayInput = document.getElementById('relay');
-var rangeSelect = document.getElementById('range');
-const btnConnect = document.getElementById('btnConnect');
-const btnDisconnect = document.getElementById('btnDisconnect');
-const statusEl = document.getElementById('status');
-const feedListEl = document.getElementById('feedList');
-
-const versionEl = document.getElementById('version');
-const logEl = document.getElementById('log');
-
-function log(line) {
-  const s = '[' + new Date().toLocaleTimeString() + '] ' + line;
-  if (logEl) {
-    logEl.textContent = (logEl.textContent ? (logEl.textContent + '\n') : '') + s;
-    logEl.scrollTop = logEl.scrollHeight;
-  }
-}
-
-// JSエラーも画面に出す（DevTools無しで原因がわかるように）
-window.addEventListener('error', (e) => {
-  log('JS ERROR: ' + (e.message || 'unknown'));
-});
-window.addEventListener('unhandledrejection', (e) => {
-  log('PROMISE REJECTION: ' + (e.reason && (e.reason.message || String(e.reason)) || 'unknown'));
-});
-
-if (versionEl) {
-  var build = new Date().toISOString().slice(0, 19).replace('T', ' ');
-  versionEl.textContent = 'version ' + APP_VERSION + ' (build ' + build + ')';
-}
-log('ready');
-
-// 直近レンジ内に投稿したユーザ数（= 表示中の魚数）
-const activeCountEl = document.getElementById('activeCount');
-let ACTIVE_WINDOW_SEC = 3600;
-function readRangeSec() {
-  const v = Number(rangeSelect && rangeSelect.value);
-  return (Number.isFinite(v) && v > 0) ? v : 3600;
-}
-function updateActiveCount() {
-  if (activeCountEl) {
-    const mins = Math.round(ACTIVE_WINDOW_SEC / 60);
-    activeCountEl.textContent = 'active (last ' + mins + 'm): ' + fishes.length;
-  }
-}
-setInterval(updateActiveCount, 1000);
-updateActiveCount();
-
-// 送信REQ数/生存サブスク数（デバッグ用）
-let reqSent = 0;
-const activeSubs = new Set();
-
-function setStatus(text) {
-  const wsState = ws ? ws.readyState : 'null';
-  const extra = ' | REQ sent: ' + reqSent +
-    ' | active subs: ' + activeSubs.size +
-    ' | ws: ' + wsState +
-    ' | pendingProfiles: ' + pendingProfiles.size +
-    ' | profileInFlight: ' + (profileInFlight ? '1' : '0');
-  statusEl.textContent = text + extra;
-}
-
-// ---- Nostr 通信（読み取り専用） ----
-let ws = null;
-let subId = null;
-let profileSubPrefix = null;
-const seenEventIds = new Set();
-
-function randId(prefix) {
-  const p = prefix || 'sub';
-  return p + '_' + Math.random().toString(16).slice(2) + '_' + Date.now().toString(16);
-}
-
-function connectRelay(url) {
-  disconnectRelay();
-
-  ACTIVE_WINDOW_SEC = readRangeSec();
-  updateActiveCount();
-
-  setStatus('connecting: ' + url);
-  log('WS connect -> ' + url);
-  ws = new WebSocket(url);
-
-  ws.onopen = () => {
-    log('WS opened');
-
-    // プロフィール取得キューを初期化（過去の失敗状態を引きずらない）
-    pendingProfiles.clear();
-    requestedProfiles.clear();
-    profileInFlight = false;
-    currentProfileSubId = null;
-    if (profileTimer) {
-      clearTimeout(profileTimer);
-      profileTimer = null;
-    }
-    btnConnect.disabled = true;
-    btnDisconnect.disabled = false;
-
-    setStatus('connected: ' + url);
-
-    // メイン購読：kind 1（ノート）
-    // 重要：多くのリレーは「最近の一定数」しか返しません。
-    subId = randId('posts');
-    const now = Math.floor(Date.now() / 1000);
-    const since = now - ACTIVE_WINDOW_SEC;
-    const filter = { kinds: [1], since: since, limit: 200 };
-    {
-    const payload = ['REQ', subId, filter];
-    log('SEND ' + JSON.stringify(payload));
-    ws.send(JSON.stringify(payload));
-  }
-    reqSent++;
-    activeSubs.add(subId);
-
-    // すでに魚が溜まっている場合に備えて、プロフィール取得を再開
-    scheduleProfileFetch();
-
-    profileSubPrefix = randId('profile');
-  };
-
-  ws.onmessage = (ev) => {
-    log('RECV ' + String(ev.data).slice(0, 220));
-    let msg;
-    try { msg = JSON.parse(ev.data); }
-    catch { return; }
-
-    const type = msg[0];
-
-    if (type === 'NOTICE') {
-      setStatus('notice: ' + msg[1]);
-      return;
+    function safeLeftPx() {
+      // Keep in sync with CSS variable semantics.
+      const w = 340;
+      const pad = 12;
+      const extra = 12;
+      return w + pad + extra;
     }
 
-    if (type === 'EOSE') {
-      // End Of Stored Events
-      const sid = msg[1];
+    function normalizePubkey(pubkey) {
+      return String(pubkey == null ? '' : pubkey).trim().toLowerCase();
+    }
 
-      // プロフィールのバッチ取得が終わったらCLOSEして次へ
-      if (sid && sid === currentProfileSubId) {
-        try {
-          {
-          const payload = ['CLOSE', currentProfileSubId];
-          log('SEND ' + JSON.stringify(payload));
-          ws.send(JSON.stringify(payload));
+    function shortKey(pubkey) {
+      const p = normalizePubkey(pubkey);
+      if (!p) return 'unknown';
+      return p.slice(0, 8);
+    }
+
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+    function timeLabel(sec) {
+      // ローカルタイム（JST）で表示
+      try {
+        const d = new Date(sec * 1000);
+        return d.toLocaleString('ja-JP', {
+          timeZone: 'Asia/Tokyo',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+      } catch {
+        return '';
+      }
+    }
+
+    function timeLabelShort(sec) {
+      try {
+        const d = new Date(sec * 1000);
+        // 例: 01/18 13:45
+        return d.toLocaleString('ja-JP', {
+          timeZone: 'Asia/Tokyo',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+      } catch {
+        return '';
+      }
+    }
+
+    // ---- Logging / status ----
+    const LOG_MAX_CHARS = 12000;
+    function log(line) {
+      const s = String(line);
+      const prev = logEl.textContent || '';
+      const next = (prev ? (prev + '\n') : '') + s;
+      logEl.textContent = next.length > LOG_MAX_CHARS ? next.slice(next.length - LOG_MAX_CHARS) : next;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    // ---- Range ----
+    let ACTIVE_WINDOW_SEC = 3600;
+    function readRangeSec() {
+      const v = Number(rangeSelect && rangeSelect.value);
+      return (Number.isFinite(v) && v > 0) ? v : 3600;
+    }
+
+    function updateActiveCount() {
+      const mins = Math.round(ACTIVE_WINDOW_SEC / 60);
+      activeCountEl.textContent = 'active (last ' + mins + 'm): ' + fishes.length;
+    }
+
+    // ---- Data ----
+    /** @type {Map<string, any>} */
+    const fishByPubkey = new Map();
+    /** @type {any[]} */
+    const fishes = [];
+    /** @type {any[]} */
+    const bubbles = [];
+
+    /** @type {any[]} */
+    const posts = [];
+    const postIds = new Set();
+
+    const profileCache = new Map();
+
+    // avatar image cache (pubkey -> { url, img, state })
+    const avatarCache = new Map();
+    const requestedProfiles = new Set();
+    const pendingProfiles = new Set();
+    let profileInFlight = false;
+    let profileTimer = null;
+    let subIdProfiles = null;
+
+    // ---- WebSocket ----
+    let ws = null;
+    let subIdPosts = null;
+    const activeSubs = new Set();
+    let reqSent = 0;
+    let eventsRecv = 0;
+    let lastRecvMs = 0;
+
+    function randId(prefix) {
+      return prefix + '-' + Math.random().toString(16).slice(2) + '-' + Date.now().toString(16);
+    }
+
+    function send(payload) {
+      if (!ws || ws.readyState !== 1) return;
+      const s = JSON.stringify(payload);
+      log('SEND ' + s);
+      ws.send(s);
+    }
+
+    function sendReq(subId, filter) {
+      send(['REQ', subId, filter]);
+      reqSent++;
+      activeSubs.add(subId);
+      updateStatusLine();
+    }
+
+    function sendClose(subId) {
+      if (!subId) return;
+      send(['CLOSE', subId]);
+      activeSubs.delete(subId);
+      updateStatusLine();
+    }
+
+    function updateStatusLine() {
+      const rs = ws ? ws.readyState : -1;
+      const since = lastRecvMs ? ((nowMs() - lastRecvMs) / 1000).toFixed(1) + 's' : '-';
+      setStatus(
+        'ws=' + rs +
+        ' subs=' + activeSubs.size +
+        ' reqSent=' + reqSent +
+        ' events=' + eventsRecv +
+        ' lastRecv=' + since
+      );
+    }
+
+    function disconnectRelay() {
+      try {
+        if (profileTimer) {
+          clearTimeout(profileTimer);
+          profileTimer = null;
         }
-          activeSubs.delete(currentProfileSubId);
-        } catch {}
-        currentProfileSubId = null;
         profileInFlight = false;
 
-        if (pendingProfiles.size > 0) scheduleProfileFetch();
+        if (ws && ws.readyState === 1) {
+          sendClose(subIdPosts);
+          sendClose(subIdProfiles);
+        }
+
+        if (ws) {
+          ws.onopen = null;
+          ws.onmessage = null;
+          ws.onerror = null;
+          ws.onclose = null;
+          try { ws.close(); } catch {}
+        }
+      } finally {
+        ws = null;
+        subIdPosts = null;
+        subIdProfiles = null;
+        activeSubs.clear();
+        updateStatusLine();
+        btnConnect.disabled = false;
+        btnDisconnect.disabled = true;
+        log('WS closed');
       }
-      return;
     }
 
-    if (type === 'EVENT') {
-      const sid = msg[1];
-      const event = msg[2];
-      if (!event || !event.id) return;
-      if (seenEventIds.has(event.id)) return;
-      seenEventIds.add(event.id);
+    function connectRelay(url) {
+      disconnectRelay();
 
-      if (event.kind === 1) {
-        handleNoteEvent(event);
-        return;
-      }
+      ACTIVE_WINDOW_SEC = readRangeSec();
+      updateActiveCount();
 
-      if (event.kind === 0) {
-        handleProfileEvent(event, sid);
-        return;
-      }
-    }
-  };
+      setStatus('connecting: ' + url);
+      log('CONNECT ' + url);
 
-  ws.onclose = () => {
-    log('WS closed');
-    btnConnect.disabled = false;
-    btnDisconnect.disabled = true;
-    setStatus('disconnected');
-    ws = null;
-    subId = null;
-    profileSubPrefix = null;
+      ws = new WebSocket(url);
+      btnConnect.disabled = true;
+      btnDisconnect.disabled = false;
 
-    // プロフィール取得状態もリセット
-    profileInFlight = false;
-    currentProfileSubId = null;
-    if (profileTimer) {
-      clearTimeout(profileTimer);
-      profileTimer = null;
-    }
-    activeSubs.clear();
-  };
+      ws.onopen = () => {
+        log('WS opened');
+        updateStatusLine();
 
-  ws.onerror = () => {
-    log('WS error');
-    setStatus('error');
-  };
-}
+        // Reset profile queue state per connection
+        pendingProfiles.clear();
+        requestedProfiles.clear();
+        profileInFlight = false;
+        subIdProfiles = null;
+        if (profileTimer) {
+          clearTimeout(profileTimer);
+          profileTimer = null;
+        }
 
-function disconnectRelay() {
-  if (ws) {
-    try {
-      if (subId) {
-        {
-        const payload = ['CLOSE', subId];
-        log('SEND ' + JSON.stringify(payload));
-        ws.send(JSON.stringify(payload));
-      }
-        activeSubs.delete(subId);
-      }
-      if (currentProfileSubId) {
-        {
-        const payload = ['CLOSE', currentProfileSubId];
-        log('SEND ' + JSON.stringify(payload));
-        ws.send(JSON.stringify(payload));
-      }
-        activeSubs.delete(currentProfileSubId);
-      }
-    } catch {}
-    try { ws.close(); } catch {}
-  }
-}
+        // Subscribe posts (kind 1) within window
+        subIdPosts = randId('posts');
+        const now = Math.floor(Date.now() / 1000);
+        const since = now - ACTIVE_WINDOW_SEC;
+        const filter = { kinds: [1], since: since, limit: 200 };
+        sendReq(subIdPosts, filter);
+      };
 
-btnConnect.addEventListener('click', () => {
-  ACTIVE_WINDOW_SEC = readRangeSec();
-  updateActiveCount();
-  const url = relayInput.value.trim();
-  if (!url) return;
-  connectRelay(url);
-});
-
-if (rangeSelect) {
-  rangeSelect.addEventListener('change', () => {
-    ACTIVE_WINDOW_SEC = readRangeSec();
-    updateActiveCount();
-    // 接続中なら再接続して since を反映
-    if (ws && ws.readyState === 1) {
-      const url = relayInput.value.trim();
-      if (url) connectRelay(url);
-    }
-  });
-}
-
-btnDisconnect.addEventListener('click', () => {
-  disconnectRelay();
-});
-
-// ---- イベント処理 ----
-function nowSec() { return Math.floor(Date.now() / 1000); }
-
-function handleNoteEvent(e) {
-  const f = ensureFish(e.pubkey);
-  if (!f) return;
-  f.latest = sanitizeOneLine(e.content);
-  f.lastSeen = Date.now();
-
-  f.activity = Math.min(1, f.activity + 0.18);
-  f.size = Math.min(30, f.size + 0.25);
-
-  bubbles.push({ x: f.x, y: f.y - f.size, r: 2 + Math.random() * 2.5, life: 140 });
-
-  addPostToFeed(e);
-}
-
-function handleProfileEvent(e, sid) {
-  // まとめREQでは、EOSE側でCLOSEするのでここでは閉じない
-  try {
-    const obj = JSON.parse(e.content || '{}');
-    const name = obj.display_name || obj.name || null;
-    if (!name) return;
-
-    const pk = normalizePubkey(e.pubkey);
-    profileCache.set(pk, { name: name });
-    log('PROFILE ' + pk.slice(0,8) + ' -> @' + name);
-    const f = fishByPubkey.get(pk);
-    if (f) f.name = '@' + name;
-  } catch {
-    // ignore
-  }
-}
-
-// ---- プロフィール取得（まとめREQ方式） ----
-const pendingProfiles = new Set();
-const requestedProfiles = new Set();
-let profileTimer = null;
-let profileInFlight = false;
-let currentProfileSubId = null;
-
-function enqueueProfile(pubkey) {
-  const pk = normalizePubkey(pubkey);
-  if (!pk) return;
-
-  // 旧実装の名残で profileCache に {name:null} が残っていても取得を止めない
-  const cached = profileCache.get(pk);
-  if (cached && cached.name) return;
-
-  if (requestedProfiles.has(pk)) return;
-  requestedProfiles.add(pk);
-  pendingProfiles.add(pk);
-  scheduleProfileFetch();
-}
-
-function scheduleProfileFetch() {
-  if (!ws || ws.readyState !== 1) return;
-  if (profileInFlight) return;
-  if (pendingProfiles.size === 0) return;
-  if (profileTimer) return;
-
-  profileTimer = setTimeout(() => {
-    profileTimer = null;
-    fetchProfilesBatch();
-  }, 400);
-}
-
-function fetchProfilesBatch() {
-  if (!ws || ws.readyState !== 1) return;
-  if (profileInFlight) return;
-  if (pendingProfiles.size === 0) return;
-
-  const authors = Array.from(pendingProfiles).slice(0, 50);
-  authors.forEach(pk => pendingProfiles.delete(pk));
-
-  currentProfileSubId = randId('profiles');
-  profileInFlight = true;
-
-  const filter = { kinds: [0], authors: authors, limit: authors.length };
-  try {
-    ws.send(JSON.stringify(['REQ', currentProfileSubId, filter]));
-    reqSent++;
-    activeSubs.add(currentProfileSubId);
-
-    // まれにEOSEが来ないリレー対策：一定時間で強制CLOSE
-    setTimeout(() => {
-      if (ws && ws.readyState === 1 && currentProfileSubId && profileInFlight) {
+      ws.onmessage = (ev) => {
+        lastRecvMs = nowMs();
+        let msg;
         try {
-          ws.send(JSON.stringify(['CLOSE', currentProfileSubId]));
-          activeSubs.delete(currentProfileSubId);
-        } catch {}
-        currentProfileSubId = null;
-        profileInFlight = false;
-        if (pendingProfiles.size > 0) scheduleProfileFetch();
+          msg = JSON.parse(ev.data);
+        } catch {
+          log('RECV (non-json) ' + String(ev.data).slice(0, 200));
+          return;
+        }
+
+        const typ = msg && msg[0];
+        if (!typ) return;
+
+        if (typ === 'EVENT') {
+          eventsRecv++;
+          updateStatusLine();
+          const subId = msg[1];
+          const e = msg[2];
+          if (!e || typeof e.kind !== 'number') return;
+
+          if (e.kind === 1) handleNoteEvent(e);
+          else if (e.kind === 0) handleProfileEvent(e);
+          // ignore other kinds
+        } else if (typ === 'EOSE') {
+          const subId = msg[1];
+          log('EOSE ' + String(subId || ''));
+          // End of stored events for profiles sub; used to close profile batches.
+          if (subId && subId === subIdProfiles) {
+            finishProfileBatch();
+          }
+        } else if (typ === 'NOTICE') {
+          log('NOTICE ' + String(msg[1] || ''));
+        } else if (typ === 'OK') {
+          // read-only client, can ignore
+        }
+      };
+
+      ws.onerror = () => {
+        log('WS error');
+        updateStatusLine();
+      };
+
+      ws.onclose = (ev) => {
+        log('WS closed code=' + ev.code + ' reason=' + (ev.reason || ''));
+        updateStatusLine();
+        btnConnect.disabled = false;
+        btnDisconnect.disabled = true;
+      };
+    }
+
+    // ---- Posts ----
+    function addPost(e) {
+      if (!e || !e.id) return;
+      if (postIds.has(e.id)) return;
+      postIds.add(e.id);
+
+      posts.unshift({
+        id: e.id,
+        pubkey: normalizePubkey(e.pubkey),
+        createdAtSec: e.created_at || 0,
+        content: String(e.content || '')
+      });
+
+      // cap
+      if (posts.length > 200) {
+        const removed = posts.splice(200);
+        for (const r of removed) postIds.delete(r.id);
       }
-    }, 2500);
-  }
-  catch {
-    profileInFlight = false;
-    currentProfileSubId = null;
-  }
-}
 
-function sanitizeOneLine(s) {
-  const t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
-  return t || '(empty)';
-}
-
-function addPostToFeed(e) {
-  const el = document.createElement('div');
-  el.className = 'post';
-
-  const meta = document.createElement('div');
-  meta.className = 'meta';
-
-  const left = document.createElement('div');
-  const f = fishByPubkey.get(normalizePubkey(e.pubkey));
-  const who = f ? f.name : '@' + shortKey(e.pubkey);
-  left.textContent = who;
-
-  const right = document.createElement('div');
-  const dt = new Date(((e.created_at || nowSec()) * 1000));
-  right.textContent = dt.toLocaleString();
-
-  meta.appendChild(left);
-  meta.appendChild(right);
-
-  const content = document.createElement('div');
-  content.className = 'content';
-  content.textContent = e.content || '';
-
-  el.appendChild(meta);
-  el.appendChild(content);
-
-  feedListEl.prepend(el);
-
-  const max = 120;
-  while (feedListEl.children.length > max) {
-    feedListEl.removeChild(feedListEl.lastChild);
-  }
-}
-
-// 起動時は自動接続しない（誤爆防止）
-
-// ---- テキスト描画の小道具 ----
-function roundRect(ctx, x, y, w, h, r) {
-  const rr = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + rr, y);
-  ctx.arcTo(x + w, y, x + w, y + h, rr);
-  ctx.arcTo(x + w, y + h, x, y + h, rr);
-  ctx.arcTo(x, y + h, x, y, rr);
-  ctx.arcTo(x, y, x + w, y, rr);
-  ctx.closePath();
-}
-
-function ellipsize(text, maxWidth, ctx) {
-  // すでに収まるならそのまま
-  if (ctx.measureText(text).width <= maxWidth) return text;
-  const ell = '…';
-  let lo = 0;
-  let hi = text.length;
-  while (lo < hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    const s = text.slice(0, mid) + ell;
-    if (ctx.measureText(s).width <= maxWidth) lo = mid + 1;
-    else hi = mid;
-  }
-  const n = Math.max(0, lo - 1);
-  return text.slice(0, n) + ell;
-}
-
-
-function update() {
-  const now = Date.now();
-
-  // 直近1時間を過ぎた魚は取り除く（= 表示数が“直近1時間のユーザ数”と一致する）
-  for (let i = fishes.length - 1; i >= 0; i--) {
-    const f = fishes[i];
-    const age = now - (f.lastSeen || 0);
-    if (age > ACTIVE_WINDOW_SEC * 1000) {
-      fishByPubkey.delete(f.pubkey);
-      fishes.splice(i, 1);
+      renderPosts();
     }
-  }
 
-  // 動き・泡
-  for (const f of fishes) {
-    f.x += f.vx;
-    f.y += f.vy;
+    function renderPosts() {
+      const items = posts.slice(0, 80);
+      feedEl.innerHTML = items.map(p => {
+        const prof = profileCache.get(p.pubkey);
+        const name = (prof && prof.name) ? ('@' + prof.name) : ('@' + shortKey(p.pubkey));
+        const text = p.content.replace(/\s+/g, ' ').slice(0, 120);
+        const t = timeLabelShort(p.createdAtSec);
+        return (
+          '<div class="feedItem">' +
+          '  <div class="feedTop">' +
+          '    <span class="feedName">' + escapeHtml(name) + '</span>' +
+          '    <span class="feedTime">' + escapeHtml(t) + '</span>' +
+          '  </div>' +
+          '  <div class="small">' + escapeHtml(text) + '</div>' +
+          '</div>'
+        );
+      }).join('');
 
-    const SAFE_LEFT = 340 + 24;
-    if (f.x < SAFE_LEFT || f.x > canvas.width) f.vx *= -1;
-    if (f.y < 0 || f.y > canvas.height) f.vy *= -1;
-
-    // 活動度はゆっくり減衰
-    f.activity = Math.max(0, f.activity - 0.0008);
-
-    f.bubbleCooldown--;
-    if (f.bubbleCooldown <= 0) {
-      bubbles.push({ x: f.x, y: f.y - f.size, r: 2 + Math.random() * 2, life: 120 });
-      const base = 70 + Math.random() * 140;
-      const boost = (1 - f.activity) * 80;
-      f.bubbleCooldown = base + boost;
+      postStatsEl.textContent = 'showing ' + items.length + ' / total ' + posts.length;
+      // 常に最新（先頭）が見えるようにする
+      feedEl.scrollTop = 0;
     }
-  }
 
-  for (const b of bubbles) {
-    b.y -= 0.3;
-    b.life--;
-  }
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
 
-  for (let i = bubbles.length - 1; i >= 0; i--) {
-    if (bubbles[i].life <= 0) bubbles.splice(i, 1);
-  }
+    // ---- Fish ----
+    function ensureFish(pubkey) {
+      const pk = normalizePubkey(pubkey);
+      if (!pk) return null;
+      let f = fishByPubkey.get(pk);
+      if (f) return f;
 
-  updateActiveCount();
-}
+      const SAFE_LEFT = safeLeftPx();
+      const w = Math.max(64, canvas.width - SAFE_LEFT);
 
-function drawFish(f) {
-  ctx.save();
-  ctx.translate(f.x, f.y);
+      f = {
+        pubkey: pk,
+        name: '@' + shortKey(pk),
+        avatarUrl: '',
+        latestText: '',
+        latestCreatedAtSec: 0,
+        lastSeenMs: 0,
+        x: SAFE_LEFT + Math.random() * w,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.7,
+        vy: (Math.random() - 0.5) * 0.45,
+        size: 10 + Math.random() * 12,
+        activity: 0.18 + Math.random() * 0.22,
+        hue: Math.random() * 360,
+        bubbleCooldown: 10 + Math.random() * 120
+      };
 
-  // 向き（速度ベクトルからざっくり）
-  const dir = Math.sign(f.vx || 1);
-  ctx.scale(dir, 1);
+      fishes.push(f);
+      fishByPubkey.set(pk, f);
 
-  // 発光（活動度）
-  ctx.shadowBlur = 10 * f.activity;
-  ctx.shadowColor = `hsla(${f.hue}, 80%, 60%, 0.6)`;
+      enqueueProfile(pk);
+      updateActiveCount();
+      return f;
+    }
 
-  // 体
-  ctx.fillStyle = `hsla(${f.hue}, 70%, 55%, 0.9)`;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, f.size * 1.6, f.size, 0, 0, Math.PI * 2);
-  ctx.fill();
+    function handleNoteEvent(e) {
+      addPost(e);
 
-  // 尾
-  ctx.beginPath();
-  ctx.moveTo(-f.size * 1.6, 0);
-  ctx.lineTo(-f.size * 2.2, f.size * 0.6);
-  ctx.lineTo(-f.size * 2.2, -f.size * 0.6);
-  ctx.closePath();
-  ctx.fill();
+      const f = ensureFish(e.pubkey);
+      if (!f) return;
 
-  // 目
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = 'rgba(10,20,25,0.8)';
-  ctx.beginPath();
-  ctx.arc(f.size * 0.9, -f.size * 0.15, Math.max(1.4, f.size * 0.18), 0, Math.PI * 2);
-  ctx.fill();
+      // update fish state
+      const now = nowMs();
+      const createdAtSecRaw = e.created_at;
+      const createdAtSec = Number(createdAtSecRaw || 0);
+      const MAX_FUTURE_SKEW_SEC = 300; // 5 min
 
-  ctx.restore();
-
-  // --- ラベル（ユーザ名 + 最新投稿） ---
-  // 魚の外側に描く（scale/rotateの影響を受けないように別描画）
-  const pad = 6;
-  const name = f.name;
-  const latest = f.latest;
-
-  ctx.save();
-
-  // 文字サイズは魚サイズに軽く追従
-  const fontSize = Math.round(11 + Math.min(4, f.size * 0.15));
-  ctx.font = `${fontSize}px system-ui, sans-serif`;
-
-  // 2行（名前 + 投稿）
-  const maxWidth = Math.min(320, Math.max(180, canvas.width * 0.28));
-  const postLine = ellipsize(latest, maxWidth, ctx);
-  const nameW = ctx.measureText(name).width;
-  const postW = ctx.measureText(postLine).width;
-  const boxW = Math.min(maxWidth, Math.max(nameW, postW)) + pad * 2;
-  const lineH = fontSize + 4;
-  const boxH = lineH * 2 + pad * 2;
-
-  // 位置（魚の少し上）
-  let bx = f.x - boxW / 2;
-  let by = f.y - (f.size * 2.2) - boxH;
-
-  // 画面外にはみ出さないようにクランプ
-  bx = Math.max(8, Math.min(canvas.width - boxW - 8, bx));
-  by = Math.max(8, Math.min(canvas.height - boxH - 8, by));
-
-  // 背景（ほんのり）
-  ctx.fillStyle = 'rgba(4, 18, 24, 0.55)';
-  roundRect(ctx, bx, by, boxW, boxH, 10);
-  ctx.fill();
-
-  // 枠線
-  ctx.strokeStyle = `hsla(${f.hue}, 55%, 70%, 0.25)`;
-  ctx.lineWidth = 1;
-  roundRect(ctx, bx + 0.5, by + 0.5, boxW - 1, boxH - 1, 10);
-  ctx.stroke();
-
-  // テキスト
-  ctx.fillStyle = 'rgba(210, 235, 245, 0.95)';
-  ctx.fillText(name, bx + pad, by + pad + lineH - 6);
-
-  ctx.fillStyle = 'rgba(190, 220, 235, 0.85)';
-  ctx.fillText(postLine, bx + pad, by + pad + lineH * 2 - 6);
-
-  ctx.restore();
-}
-
-function drawBubble(b) {
-  ctx.strokeStyle = `rgba(200,220,255,${b.life / 120})`;
-  ctx.beginPath();
-  ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-  ctx.stroke();
-}
-
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // 水のグラデーション
-  const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  g.addColorStop(0, '#0b1d26');
-  g.addColorStop(1, '#082029');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  for (const b of bubbles) drawBubble(b);
-  for (const f of fishes) drawFish(f);
-}
-
-function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
-// ---- Fish click -> nostter profile ----
-canvas.addEventListener('click', (ev) => {
-  const rect = canvas.getBoundingClientRect();
-  const x = ev.clientX - rect.left;
-  const y = ev.clientY - rect.top;
-
-  // 左のUI領域は誤爆防止で無視
-  if (x < 340 + 24) return;
-
-  for (let i = fishes.length - 1; i >= 0; i--) {
-    const f = fishes[i];
-    const dx = x - f.x;
-    const dy = y - f.y;
-    const r = f.size * 1.8;
-    if (dx * dx + dy * dy <= r * r) {
-      const npub = toNpub(f.pubkey);
-      if (npub) {
-        const url = 'https://nostter.app/' + npub;
-        log('OPEN ' + url);
-        window.open(url, '_blank', 'noopener');
+      // lastSeenMs は原則「投稿時刻(created_at)」を基準にする。
+      // ただし created_at 欠損/異常/未来すぎる値は寿命判定を壊すので安全側にクランプしてログする。
+      let postAtMs = 0;
+      if (!Number.isFinite(createdAtSec) || createdAtSec <= 0) {
+        postAtMs = now;
+        log('WARN created_at missing/invalid for ' + shortKey(e.pubkey) + ' raw=' + String(createdAtSecRaw));
       } else {
-        log('npub convert failed: ' + f.pubkey);
+        const ms = createdAtSec * 1000;
+        const maxFutureMs = now + MAX_FUTURE_SKEW_SEC * 1000;
+        if (ms > maxFutureMs) {
+          postAtMs = now;
+          log('WARN created_at too-future for ' + shortKey(e.pubkey) + ' created_at=' + createdAtSec + ' (clamped)');
+        } else {
+          postAtMs = ms;
+        }
       }
-      return;
+
+      f.lastSeenMs = Math.max(f.lastSeenMs || 0, postAtMs);
+      f.activity = Math.min(1, f.activity + 0.15);
+
+      // 最新投稿の更新は created_at が新しい場合のみ（created_at欠損時は postAtMs を秒に丸めて比較する）
+      const effectiveCreatedAtSec = (Number.isFinite(createdAtSec) && createdAtSec > 0)
+        ? createdAtSec
+        : Math.floor(postAtMs / 1000);
+
+      if (effectiveCreatedAtSec >= (f.latestCreatedAtSec || 0)) {
+        f.latestCreatedAtSec = effectiveCreatedAtSec;
+        f.latestText = String(e.content || '').replace(/\s+/g, ' ').slice(0, 240);
+      }
+
+      // apply cached profile name if available
+      const prof = profileCache.get(f.pubkey);
+      if (prof && prof.name) f.name = '@' + prof.name;
+      if (prof && prof.picture && !f.avatarUrl) f.avatarUrl = prof.picture;
+
+      updateActiveCount();
     }
-  }
-});
 
-// ---- Minimal NIP-19 npub encoder ----
-function hexToBytes(hex) {
-  const h = String(hex || '').trim();
-  if (h.length % 2 !== 0) return null;
-  const out = new Uint8Array(h.length / 2);
-  for (let i = 0; i < out.length; i++) {
-    const v = parseInt(h.slice(i * 2, i * 2 + 2), 16);
-    if (!Number.isFinite(v)) return null;
-    out[i] = v;
-  }
-  return out;
-}
+    function handleProfileEvent(e) {
+      const pk = normalizePubkey(e.pubkey);
+      let name = '';
+      let picture = '';
+      try {
+        const obj = JSON.parse(String(e.content || '{}'));
+        name = String(obj.display_name || obj.name || '').trim();
+        picture = String(obj.picture || obj.image || '').trim();
+      } catch {
+        name = '';
+        picture = '';
+      }
 
-function convertBits(data, from, to, pad) {
-  let acc = 0;
-  let bits = 0;
-  const ret = [];
-  const maxv = (1 << to) - 1;
-  for (let i = 0; i < data.length; i++) {
-    const value = data[i];
-    if (value < 0 || (value >> from) !== 0) return null;
-    acc = (acc << from) | value;
-    bits += from;
-    while (bits >= to) {
-      bits -= to;
-      ret.push((acc >> bits) & maxv);
+      if (name) {
+        const prev = profileCache.get(pk) || {};
+        profileCache.set(pk, { name, picture: picture || prev.picture || '' });
+        log('PROFILE ' + pk.slice(0, 8) + ' -> @' + name);
+
+        const f = fishByPubkey.get(pk);
+        if (f) f.name = '@' + name;
+      } else if (picture) {
+        // name が無くても picture は拾う
+        const prev = profileCache.get(pk) || {};
+        profileCache.set(pk, { name: prev.name || '', picture });
+      }
+
+      if (picture) {
+        const f = fishByPubkey.get(pk);
+        if (f) f.avatarUrl = picture;
+      }
+
+      renderPosts();
     }
-  }
-  if (pad) {
-    if (bits > 0) ret.push((acc << (to - bits)) & maxv);
-  } else {
-    if (bits >= from) return null;
-    if (((acc << (to - bits)) & maxv) !== 0) return null;
-  }
-  return ret;
-}
 
-var BECH32_ALPHABET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+    // ---- Profile batching (kind 0) ----
+    const PROFILE_BATCH_MAX = 60;
+    const PROFILE_BATCH_TIMEOUT_MS = 2500;
 
-function bech32Polymod(values) {
-  const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
-  let chk = 1;
-  for (let p = 0; p < values.length; p++) {
-    const top = chk >> 25;
-    chk = ((chk & 0x1ffffff) << 5) ^ values[p];
-    for (let i = 0; i < 5; i++) {
-      if ((top >> i) & 1) chk ^= GEN[i];
+    function enqueueProfile(pubkey) {
+      const pk = normalizePubkey(pubkey);
+      if (!pk) return;
+
+      const cached = profileCache.get(pk);
+      if (cached && cached.name) return;
+
+      if (requestedProfiles.has(pk)) return;
+      requestedProfiles.add(pk);
+      pendingProfiles.add(pk);
+
+      scheduleProfileFetch();
     }
-  }
-  return chk;
-}
 
-function bech32HrpExpand(hrp) {
-  const ret = [];
-  for (let i = 0; i < hrp.length; i++) ret.push(hrp.charCodeAt(i) >> 5);
-  ret.push(0);
-  for (let i = 0; i < hrp.length; i++) ret.push(hrp.charCodeAt(i) & 31);
-  return ret;
-}
+    function scheduleProfileFetch() {
+      if (!ws || ws.readyState !== 1) return;
+      if (profileInFlight) return;
+      if (pendingProfiles.size === 0) return;
 
-function bech32CreateChecksum(hrp, data) {
-  const values = bech32HrpExpand(hrp).concat(data).concat([0, 0, 0, 0, 0, 0]);
-  const mod = bech32Polymod(values) ^ 1;
-  const ret = [];
-  for (let p = 0; p < 6; p++) ret.push((mod >> (5 * (5 - p))) & 31);
-  return ret;
-}
+      profileInFlight = true;
 
-function bech32Encode(hrp, data) {
-  const combined = data.concat(bech32CreateChecksum(hrp, data));
-  let out = hrp + '1';
-  for (let i = 0; i < combined.length; i++) out += BECH32_ALPHABET[combined[i]];
-  return out;
-}
+      const authors = [];
+      for (const pk of pendingProfiles) {
+        authors.push(pk);
+        if (authors.length >= PROFILE_BATCH_MAX) break;
+      }
+      for (const pk of authors) pendingProfiles.delete(pk);
 
-function toNpub(hexPubkey) {
-  const bytes = hexToBytes(hexPubkey);
-  if (!bytes) return null;
-  const five = convertBits(Array.from(bytes), 8, 5, true);
-  if (!five) return null;
-  return bech32Encode('npub', five);
-}
+      subIdProfiles = randId('profiles');
+      const filter = { kinds: [0], authors: authors, limit: authors.length };
+      sendReq(subIdProfiles, filter);
 
-loop();
-</script>
+      // Safety close if relay never sends EOSE.
+      if (profileTimer) clearTimeout(profileTimer);
+      profileTimer = setTimeout(() => {
+        log('profiles timeout -> CLOSE');
+        finishProfileBatch();
+      }, PROFILE_BATCH_TIMEOUT_MS);
+    }
+
+    function finishProfileBatch() {
+      if (profileTimer) {
+        clearTimeout(profileTimer);
+        profileTimer = null;
+      }
+      if (subIdProfiles) {
+        sendClose(subIdProfiles);
+        subIdProfiles = null;
+      }
+      profileInFlight = false;
+
+      // If still pending, schedule next batch.
+      if (pendingProfiles.size > 0) {
+        // Small delay to avoid hammering.
+        setTimeout(scheduleProfileFetch, 120);
+      }
+    }
+
+    // ---- Animation / drawing ----
+    function resize() {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      canvas.width = Math.floor(window.innerWidth * dpr);
+      canvas.height = Math.floor(window.innerHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      // Keep fishes in bounds
+      const SAFE_LEFT = safeLeftPx();
+      for (const f of fishes) {
+        f.x = clamp(f.x, SAFE_LEFT, window.innerWidth);
+        f.y = clamp(f.y, 0, window.innerHeight);
+      }
+    }
+
+    function removeExpiredFishes(now) {
+      // lastSeenMs は投稿時刻ベース。now との差分で Range 外の魚を消す。
+      for (let i = fishes.length - 1; i >= 0; i--) {
+        const f = fishes[i];
+        const last = Number(f.lastSeenMs || 0);
+        if (last > 0 && (now - last > ACTIVE_WINDOW_SEC * 1000)) {
+          fishByPubkey.delete(f.pubkey);
+          fishes.splice(i, 1);
+          log('PRUNE ' + f.pubkey.slice(0, 8) + ' ageSec=' + ((now - last) / 1000).toFixed(1));
+        }
+      }
+    }
+
+    function update() {
+      const now = nowMs();
+      removeExpiredFishes(now);
+
+      const SAFE_LEFT = safeLeftPx();
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      for (const f of fishes) {
+        f.x += f.vx;
+        f.y += f.vy;
+
+        if (f.x < SAFE_LEFT || f.x > w) f.vx *= -1;
+        if (f.y < 0 || f.y > h) f.vy *= -1;
+
+        f.x = clamp(f.x, SAFE_LEFT, w);
+        f.y = clamp(f.y, 0, h);
+
+        f.activity = Math.max(0, f.activity - 0.0008);
+
+        f.bubbleCooldown--;
+        if (f.bubbleCooldown <= 0) {
+          bubbles.push({ x: f.x, y: f.y - f.size, r: 2 + Math.random() * 2, life: 120 });
+          const base = 70 + Math.random() * 140;
+          const boost = (1 - f.activity) * 80;
+          f.bubbleCooldown = base + boost;
+        }
+      }
+
+      for (const b of bubbles) {
+        b.y -= 0.3;
+        b.life--;
+      }
+      for (let i = bubbles.length - 1; i >= 0; i--) {
+        if (bubbles[i].life <= 0) bubbles.splice(i, 1);
+      }
+
+      updateActiveCount();
+    }
+
+    function drawBackground() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      // gradient water
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, 'rgba(10, 40, 55, 1)');
+      g.addColorStop(1, 'rgba(2, 10, 16, 1)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+
+      // faint light rays
+      ctx.globalAlpha = 0.10;
+      for (let i = 0; i < 8; i++) {
+        const x = (w * (i + 0.5)) / 8;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + 80, h);
+        ctx.lineTo(x - 20, h);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(200, 240, 255, 0.35)';
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // safe-left visual separator (debug-friendly but subtle)
+      const SAFE_LEFT = safeLeftPx();
+      ctx.globalAlpha = 0.08;
+      ctx.fillStyle = 'rgba(220, 250, 255, 1)';
+      ctx.fillRect(SAFE_LEFT, 0, 1, h);
+      ctx.globalAlpha = 1;
+    }
+
+    function roundRectPath(ctx, x, y, w, h, r) {
+      const rr = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + rr, y);
+      ctx.arcTo(x + w, y, x + w, y + h, rr);
+      ctx.arcTo(x + w, y + h, x, y + h, rr);
+      ctx.arcTo(x, y + h, x, y, rr);
+      ctx.arcTo(x, y, x + w, y, rr);
+      ctx.closePath();
+    }
+
+    function wrapLinesByWidth(ctx, text, maxWidth, maxLines) {
+      const s = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!s) return [];
+
+      // 日本語（スペースが少ない）も想定して、基本は1文字ずつのラップ。
+      const chars = Array.from(s);
+      const lines = [];
+      let line = '';
+
+      for (let i = 0; i < chars.length; i++) {
+        const ch = chars[i];
+        const test = line + ch;
+        if (ctx.measureText(test).width <= maxWidth || line.length === 0) {
+          line = test;
+        } else {
+          lines.push(line);
+          line = ch;
+          if (lines.length >= maxLines - 1) break;
+        }
+      }
+      if (line && lines.length < maxLines) lines.push(line);
+
+      // 省略（三点リーダ）: 必ず maxWidth に収める
+      if (lines.length === maxLines && chars.length > 0) {
+        let last = lines[maxLines - 1];
+        while (last && ctx.measureText(last + '…').width > maxWidth) {
+          last = last.slice(0, -1);
+        }
+        lines[maxLines - 1] = (last || '').trimEnd() + '…';
+      }
+
+      return lines;
+    }
+
+    function ensureAvatarLoaded(pubkey, url) {
+      const pk = normalizePubkey(pubkey);
+      const u = String(url || '').trim();
+      if (!pk || !u) return;
+
+      const cur = avatarCache.get(pk);
+      if (cur && cur.url === u && (cur.state === 'loaded' || cur.state === 'loading')) return;
+
+      const img = new Image();
+      // NOTE: crossOrigin を強制すると、CORSヘッダ無しの画像が読み込めずアイコンが出ないことがある。
+      // ここでは敢えて設定しない（canvasがtaintされても本アプリはピクセル読み取りをしないため問題ない）。
+      avatarCache.set(pk, { url: u, img, state: 'loading' });
+
+      img.onload = () => {
+        const rec = avatarCache.get(pk);
+        if (rec && rec.img === img) rec.state = 'loaded';
+      };
+      img.onerror = () => {
+        const rec = avatarCache.get(pk);
+        if (rec && rec.img === img) rec.state = 'error';
+      };
+      img.src = u;
+    }
+
+    function drawAvatarCircle(f, cx, cy, r) {
+      const prof = profileCache.get(f.pubkey);
+      const url = (f.avatarUrl || (prof && prof.picture) || '').trim();
+      if (url) ensureAvatarLoaded(f.pubkey, url);
+
+      const rec = avatarCache.get(f.pubkey);
+      if (rec && rec.state === 'loaded' && rec.img && rec.img.naturalWidth > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+
+        // cover-crop
+        const iw = rec.img.naturalWidth;
+        const ih = rec.img.naturalHeight;
+        const s = Math.max((r * 2) / iw, (r * 2) / ih);
+        const dw = iw * s;
+        const dh = ih * s;
+        const dx = cx - dw / 2;
+        const dy = cy - dh / 2;
+        ctx.drawImage(rec.img, dx, dy, dw, dh);
+
+        ctx.restore();
+
+        // border
+        ctx.save();
+        ctx.strokeStyle = 'rgba(200, 240, 255, 0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        return;
+      }
+
+      // fallback: colored dot
+      ctx.save();
+      ctx.fillStyle = 'hsla(' + f.hue + ', 70%, 60%, 0.95)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function ellipsizeToWidth(ctx, text, maxWidth) {
+      const s = String(text || '');
+      if (ctx.measureText(s).width <= maxWidth) return s;
+      let t = s;
+      while (t.length > 0 && ctx.measureText(t + '…').width > maxWidth) {
+        t = t.slice(0, -1);
+      }
+      return (t || '').trimEnd() + '…';
+    }
+
+    function drawSpeechBubble(f) {
+      const SAFE_LEFT = safeLeftPx();
+      const pad = 8;
+      const gap = 6;
+      const maxW = 280;
+      const headerFont = '12px ui-sans-serif, system-ui';
+      const bodyFont = '11px ui-sans-serif, system-ui';
+      const lineH = 14;
+
+      const name = f.name || ('@' + shortKey(f.pubkey));
+      const timeStr = f.latestCreatedAtSec ? timeLabelShort(f.latestCreatedAtSec) : '';
+      const headerTextRaw = name + (timeStr ? ('  ' + timeStr) : '');
+
+      ctx.save();
+
+      const iconR = 8;
+      const iconSpace = iconR * 2 + 6;
+
+      // まず最大幅で仮ラップして、実測から吹き出し幅を決める
+      const maxInner = maxW - pad * 2;
+      ctx.font = bodyFont;
+      let lines = wrapLinesByWidth(ctx, f.latestText || '', maxInner, 3);
+      let bodyW = 0;
+      for (const ln of lines) bodyW = Math.max(bodyW, ctx.measureText(ln).width);
+
+      ctx.font = headerFont;
+      const headerTextW = ctx.measureText(headerTextRaw).width;
+      const headerW = iconSpace + headerTextW;
+
+      // 吹き出し幅: header/body の大きい方に合わせる（上限 maxW）
+      let bubbleW = Math.min(maxW, Math.max(190, Math.max(headerW, bodyW) + pad * 2));
+      const innerW = bubbleW - pad * 2;
+
+      // 実際の innerW で必ず再ラップ（ここがはみ出し対策の要）
+      ctx.font = bodyFont;
+      lines = wrapLinesByWidth(ctx, f.latestText || '', innerW, 3);
+
+      // 念のため各行も幅内に収める（保険）
+      for (let i = 0; i < lines.length; i++) {
+        if (ctx.measureText(lines[i]).width > innerW) {
+          lines[i] = ellipsizeToWidth(ctx, lines[i], innerW);
+        }
+      }
+
+      const bodyH = lines.length ? (lines.length * lineH) : 0;
+      const headerH = 18;
+      const bubbleH = pad * 2 + headerH + (lines.length ? (gap + bodyH) : 0);
+
+      // position above fish, clamped within screen and outside UI safe area
+      let bx = f.x - bubbleW / 2;
+      let by = f.y - f.size * 2.6 - bubbleH;
+      bx = clamp(bx, SAFE_LEFT + 6, window.innerWidth - bubbleW - 6);
+      by = clamp(by, 6, window.innerHeight - bubbleH - 6);
+
+      // bubble
+      ctx.fillStyle = 'rgba(6, 18, 26, 0.80)';
+      ctx.strokeStyle = 'rgba(200, 240, 255, 0.22)';
+      ctx.lineWidth = 1;
+      roundRectPath(ctx, bx, by, bubbleW, bubbleH, 12);
+      ctx.fill();
+      ctx.stroke();
+
+      // tail
+      ctx.beginPath();
+      ctx.moveTo(f.x, by + bubbleH);
+      ctx.lineTo(f.x - 10, by + bubbleH + 10);
+      ctx.lineTo(f.x + 10, by + bubbleH + 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // header: avatar + name + time (ellipsized)
+      const hx = bx + pad;
+      const hy = by + pad + 12;
+
+      // avatar
+      drawAvatarCircle(f, hx + iconR, hy - 4, iconR);
+
+      // header text
+      ctx.font = headerFont;
+      ctx.fillStyle = 'rgba(230, 248, 255, 0.96)';
+      const maxHeaderTextW = Math.max(0, innerW - iconSpace);
+      const headerText = ellipsizeToWidth(ctx, headerTextRaw, maxHeaderTextW);
+      ctx.fillText(headerText, hx + iconSpace, hy);
+
+      // body
+      if (lines.length) {
+        ctx.font = bodyFont;
+        ctx.fillStyle = 'rgba(210, 238, 250, 0.90)';
+        let ty = by + pad + headerH + gap + 11;
+        const tx = bx + pad;
+        for (const ln of lines) {
+          ctx.fillText(ln, tx, ty);
+          ty += lineH;
+        }
+      }
+
+      ctx.restore();
+    }
+
+    function drawFish(f) {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      // fish body
+      const bodyLen = f.size * 2.4;
+      const bodyH = f.size * 1.4;
+      const dir = f.vx >= 0 ? 1 : -1;
+
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      ctx.scale(dir, 1);
+
+      ctx.fillStyle = 'hsla(' + f.hue + ', 70%, 55%, 0.95)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, bodyLen * 0.5, bodyH * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // tail
+      ctx.fillStyle = 'hsla(' + f.hue + ', 70%, 45%, 0.95)';
+      ctx.beginPath();
+      ctx.moveTo(-bodyLen * 0.5, 0);
+      ctx.lineTo(-bodyLen * 0.8, bodyH * 0.35);
+      ctx.lineTo(-bodyLen * 0.8, -bodyH * 0.35);
+      ctx.closePath();
+      ctx.fill();
+
+      // eye
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath();
+      ctx.arc(bodyLen * 0.18, -bodyH * 0.12, Math.max(1.5, f.size * 0.12), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.beginPath();
+      ctx.arc(bodyLen * 0.2, -bodyH * 0.12, Math.max(1.0, f.size * 0.07), 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+
+      // speech bubble (not mirrored)
+      drawSpeechBubble(f);
+    }
+
+    function drawBubbles() {
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = 'rgba(200, 240, 255, 0.8)';
+      for (const b of bubbles) {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function draw() {
+      drawBackground();
+      drawBubbles();
+      for (const f of fishes) drawFish(f);
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // ---- Click -> nostter ----
+    canvas.addEventListener('click', (ev) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = ev.clientX - rect.left;
+      const y = ev.clientY - rect.top;
+
+      if (x < safeLeftPx()) return; // ignore UI area
+
+      for (let i = fishes.length - 1; i >= 0; i--) {
+        const f = fishes[i];
+        const dx = x - f.x;
+        const dy = y - f.y;
+        const r = f.size * 1.9;
+        if (dx * dx + dy * dy <= r * r) {
+          const npub = toNpub(f.pubkey);
+          if (!npub) {
+            log('npub convert failed: ' + f.pubkey);
+            return;
+          }
+          const url = 'https://nostter.app/' + npub;
+          log('OPEN ' + url);
+          window.open(url, '_blank', 'noopener');
+          return;
+        }
+      }
+    });
+
+    // ---- Minimal NIP-19 npub encoder (single definition) ----
+    const BECH32_ALPHABET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+
+    function hexToBytes(hex) {
+      const h = String(hex || '').trim();
+      if (h.length % 2 !== 0) return null;
+      const out = new Uint8Array(h.length / 2);
+      for (let i = 0; i < out.length; i++) {
+        const v = parseInt(h.slice(i * 2, i * 2 + 2), 16);
+        if (!Number.isFinite(v)) return null;
+        out[i] = v;
+      }
+      return out;
+    }
+
+    function convertBits(data, from, to, pad) {
+      let acc = 0;
+      let bits = 0;
+      const ret = [];
+      const maxv = (1 << to) - 1;
+      for (let i = 0; i < data.length; i++) {
+        const value = data[i];
+        if (value < 0 || (value >> from) !== 0) return null;
+        acc = (acc << from) | value;
+        bits += from;
+        while (bits >= to) {
+          bits -= to;
+          ret.push((acc >> bits) & maxv);
+        }
+      }
+      if (pad) {
+        if (bits > 0) ret.push((acc << (to - bits)) & maxv);
+      } else {
+        if (bits >= from) return null;
+        if (((acc << (to - bits)) & maxv) !== 0) return null;
+      }
+      return ret;
+    }
+
+    function bech32Polymod(values) {
+      const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+      let chk = 1;
+      for (let p = 0; p < values.length; p++) {
+        const top = chk >> 25;
+        chk = ((chk & 0x1ffffff) << 5) ^ values[p];
+        for (let i = 0; i < 5; i++) {
+          if ((top >> i) & 1) chk ^= GEN[i];
+        }
+      }
+      return chk;
+    }
+
+    function bech32HrpExpand(hrp) {
+      const ret = [];
+      for (let i = 0; i < hrp.length; i++) ret.push(hrp.charCodeAt(i) >> 5);
+      ret.push(0);
+      for (let i = 0; i < hrp.length; i++) ret.push(hrp.charCodeAt(i) & 31);
+      return ret;
+    }
+
+    function bech32CreateChecksum(hrp, data) {
+      const values = bech32HrpExpand(hrp).concat(data).concat([0, 0, 0, 0, 0, 0]);
+      const mod = bech32Polymod(values) ^ 1;
+      const ret = [];
+      for (let p = 0; p < 6; p++) ret.push((mod >> (5 * (5 - p))) & 31);
+      return ret;
+    }
+
+    function bech32Encode(hrp, data) {
+      const combined = data.concat(bech32CreateChecksum(hrp, data));
+      let out = hrp + '1';
+      for (let i = 0; i < combined.length; i++) out += BECH32_ALPHABET[combined[i]];
+      return out;
+    }
+
+    function toNpub(hexPubkey) {
+      const bytes = hexToBytes(hexPubkey);
+      if (!bytes) return null;
+      const five = convertBits(Array.from(bytes), 8, 5, true);
+      if (!five) return null;
+      return bech32Encode('npub', five);
+    }
+
+    // ---- Wire UI ----
+    function init() {
+      const build = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      versionEl.textContent = 'v' + APP_VERSION + ' (' + build + ')';
+
+      ACTIVE_WINDOW_SEC = readRangeSec();
+      updateActiveCount();
+      updateStatusLine();
+      renderPosts();
+
+      btnConnect.addEventListener('click', () => {
+        ACTIVE_WINDOW_SEC = readRangeSec();
+        updateActiveCount();
+        const url = relayInput.value.trim();
+        if (url) connectRelay(url);
+      });
+
+      btnDisconnect.addEventListener('click', () => {
+        disconnectRelay();
+      });
+
+      rangeSelect.addEventListener('change', () => {
+        ACTIVE_WINDOW_SEC = readRangeSec();
+        removeExpiredFishes(nowMs());
+        updateActiveCount();
+        if (ws && ws.readyState === 1) {
+          const url = relayInput.value.trim();
+          if (url) connectRelay(url);
+        }
+      });
+
+      window.addEventListener('resize', resize);
+      resize();
+      log('ready');
+      loop();
+    }
+
+    init();
+  </script>
 </body>
 </html>
