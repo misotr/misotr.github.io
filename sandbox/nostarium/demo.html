@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Nostarium</title>
+  <title>Nostarium demo</title>
   <style>
     :root {
       --panel-w: 340px;
@@ -188,9 +188,9 @@
         <label for="range">Range</label>
         <select id="range">
           <option value="600" selected>10分</option>
+          <option value="1200">20分</option>
           <option value="1800">30分</option>
           <option value="3600">1時間</option>
-          <option value="7200">2時間</option>
         </select>
         <button id="btnConnect">Connect</button>
         <button id="btnDisconnect" disabled>Disconnect</button>
@@ -214,7 +214,7 @@
 
   <script>
     // ---- Version ----
-    const APP_VERSION = '0.3.4';
+    const APP_VERSION = '0.3.7';
 
     // ---- DOM ----
     const canvas = document.getElementById('tank');
@@ -313,9 +313,21 @@
       return (Number.isFinite(v) && v > 0) ? v : 3600;
     }
 
-    function updateActiveCount() {
+    function updateActiveCountIfNeeded() {
+      if (!fishCountDirty) return;
+      fishCountDirty = false;
       const mins = Math.round(ACTIVE_WINDOW_SEC / 60);
-      activeCountEl.textContent = 'active (last ' + mins + 'm): ' + fishes.length;
+      const text = 'active (last ' + mins + 'm): ' + fishes.length;
+      if (text !== lastActiveCountText) {
+        activeCountEl.textContent = text;
+        lastActiveCountText = text;
+      }
+    }
+
+    // Back-compat: existing callers keep using this.
+    function updateActiveCount() {
+      markFishCountDirty();
+      updateActiveCountIfNeeded();
     }
 
     // ---- Data ----
@@ -334,6 +346,17 @@
 
     // avatar image cache (pubkey -> { url, img, state })
     const avatarCache = new Map();
+
+    // ---- Performance knobs ----
+    const TARGET_FPS = 30;
+    const FRAME_MS = 1000 / TARGET_FPS;
+    let isPaused = false;
+    let lastFrameTs = 0;
+
+    // Active count UI update: dirty (avoid DOM updates every frame)
+    let fishCountDirty = true;
+    let lastActiveCountText = '';
+    function markFishCountDirty() { fishCountDirty = true; }
     const requestedProfiles = new Set();
     const pendingProfiles = new Set();
     let profileInFlight = false;
@@ -587,7 +610,8 @@
       fishByPubkey.set(pk, f);
 
       enqueueProfile(pk);
-      updateActiveCount();
+      markFishCountDirty();
+      updateActiveCountIfNeeded();
       return f;
     }
 
@@ -638,7 +662,7 @@
       if (prof && prof.name) f.name = '@' + prof.name;
       if (prof && prof.picture && !f.avatarUrl) f.avatarUrl = prof.picture;
 
-      updateActiveCount();
+      updateActiveCountIfNeeded();
     }
 
     function handleProfileEvent(e) {
@@ -760,6 +784,8 @@
         if (last > 0 && (now - last > ACTIVE_WINDOW_SEC * 1000)) {
           fishByPubkey.delete(f.pubkey);
           fishes.splice(i, 1);
+          markFishCountDirty();
+          updateActiveCountIfNeeded();
           log('PRUNE ' + f.pubkey.slice(0, 8) + ' ageSec=' + ((now - last) / 1000).toFixed(1));
         }
       }
@@ -802,7 +828,8 @@
         if (bubbles[i].life <= 0) bubbles.splice(i, 1);
       }
 
-      updateActiveCount();
+      // No per-frame DOM updates.
+      updateActiveCountIfNeeded();
     }
 
     function drawBackground() {
@@ -962,59 +989,98 @@
       return (t || '').trimEnd() + '…';
     }
 
-    function drawSpeechBubble(f) {
-      const SAFE_LEFT = safeLeftPx();
+    function computeBubbleLayout(f) {
+      const name = f.name || ('@' + shortKey(f.pubkey));
+      const timeStr = f.latestCreatedAtSec ? timeLabelShort(f.latestCreatedAtSec) : '';
+      const headerTextRaw = name + (timeStr ? ('  ' + timeStr) : '');
+      const bodyRaw = String(f.latestText || '');
+      const key = headerTextRaw + '¥n' + bodyRaw;
+
+      if (f._bubbleLayout && f._bubbleLayout.key === key) return f._bubbleLayout;
+
       const pad = 8;
       const gap = 6;
       const maxW = 280;
       const headerFont = '12px ui-sans-serif, system-ui';
       const bodyFont = '11px ui-sans-serif, system-ui';
       const lineH = 14;
-
-      const name = f.name || ('@' + shortKey(f.pubkey));
-      const timeStr = f.latestCreatedAtSec ? timeLabelShort(f.latestCreatedAtSec) : '';
-      const headerTextRaw = name + (timeStr ? ('  ' + timeStr) : '');
-
-      ctx.save();
-
       const iconR = 8;
       const iconSpace = iconR * 2 + 6;
 
-      // まず最大幅で仮ラップして、実測から吹き出し幅を決める
+      ctx.save();
+
+      // First pass: wrap at max inner width
       const maxInner = maxW - pad * 2;
       ctx.font = bodyFont;
-      let lines = wrapLinesByWidth(ctx, f.latestText || '', maxInner, 3);
+      let lines = wrapLinesByWidth(ctx, bodyRaw, maxInner, 3);
       let bodyW = 0;
       for (const ln of lines) bodyW = Math.max(bodyW, ctx.measureText(ln).width);
 
+      // Header measurement
       ctx.font = headerFont;
       const headerTextW = ctx.measureText(headerTextRaw).width;
       const headerW = iconSpace + headerTextW;
 
-      // 吹き出し幅: header/body の大きい方に合わせる（上限 maxW）
-      let bubbleW = Math.min(maxW, Math.max(190, Math.max(headerW, bodyW) + pad * 2));
+      // Decide bubble width
+      const bubbleW = Math.min(maxW, Math.max(190, Math.max(headerW, bodyW) + pad * 2));
       const innerW = bubbleW - pad * 2;
 
-      // 実際の innerW で必ず再ラップ（ここがはみ出し対策の要）
+      // Second pass: re-wrap to actual inner width
       ctx.font = bodyFont;
-      lines = wrapLinesByWidth(ctx, f.latestText || '', innerW, 3);
-
-      // 念のため各行も幅内に収める（保険）
+      lines = wrapLinesByWidth(ctx, bodyRaw, innerW, 3);
       for (let i = 0; i < lines.length; i++) {
         if (ctx.measureText(lines[i]).width > innerW) {
           lines[i] = ellipsizeToWidth(ctx, lines[i], innerW);
         }
       }
 
+      // Header ellipsize to fit
+      ctx.font = headerFont;
+      const maxHeaderTextW = Math.max(0, innerW - iconSpace);
+      const headerText = ellipsizeToWidth(ctx, headerTextRaw, maxHeaderTextW);
+
       const bodyH = lines.length ? (lines.length * lineH) : 0;
       const headerH = 18;
       const bubbleH = pad * 2 + headerH + (lines.length ? (gap + bodyH) : 0);
+
+      ctx.restore();
+
+      f._bubbleLayout = {
+        key,
+        pad,
+        gap,
+        bubbleW,
+        bubbleH,
+        innerW,
+        headerFont,
+        bodyFont,
+        headerH,
+        lineH,
+        iconR,
+        iconSpace,
+        headerText,
+        lines
+      };
+      return f._bubbleLayout;
+    }
+
+    function drawSpeechBubble(f) {
+      const SAFE_LEFT = safeLeftPx();
+      const layout = computeBubbleLayout(f);
+
+      const pad = layout.pad;
+      const gap = layout.gap;
+      const bubbleW = layout.bubbleW;
+      const bubbleH = layout.bubbleH;
+      const innerW = layout.innerW;
 
       // position above fish, clamped within screen and outside UI safe area
       let bx = f.x - bubbleW / 2;
       let by = f.y - f.size * 2.6 - bubbleH;
       bx = clamp(bx, SAFE_LEFT + 6, window.innerWidth - bubbleW - 6);
       by = clamp(by, 6, window.innerHeight - bubbleH - 6);
+
+      ctx.save();
 
       // bubble
       ctx.fillStyle = 'rgba(6, 18, 26, 0.80)';
@@ -1033,29 +1099,25 @@
       ctx.fill();
       ctx.stroke();
 
-      // header: avatar + name + time (ellipsized)
+      // header: avatar + text
       const hx = bx + pad;
       const hy = by + pad + 12;
 
-      // avatar
-      drawAvatarCircle(f, hx + iconR, hy - 4, iconR);
+      drawAvatarCircle(f, hx + layout.iconR, hy - 4, layout.iconR);
 
-      // header text
-      ctx.font = headerFont;
+      ctx.font = layout.headerFont;
       ctx.fillStyle = 'rgba(230, 248, 255, 0.96)';
-      const maxHeaderTextW = Math.max(0, innerW - iconSpace);
-      const headerText = ellipsizeToWidth(ctx, headerTextRaw, maxHeaderTextW);
-      ctx.fillText(headerText, hx + iconSpace, hy);
+      ctx.fillText(layout.headerText, hx + layout.iconSpace, hy);
 
       // body
-      if (lines.length) {
-        ctx.font = bodyFont;
+      if (layout.lines.length) {
+        ctx.font = layout.bodyFont;
         ctx.fillStyle = 'rgba(210, 238, 250, 0.90)';
-        let ty = by + pad + headerH + gap + 11;
+        let ty = by + pad + layout.headerH + gap + 11;
         const tx = bx + pad;
-        for (const ln of lines) {
+        for (const ln of layout.lines) {
           ctx.fillText(ln, tx, ty);
-          ty += lineH;
+          ty += layout.lineH;
         }
       }
 
@@ -1123,7 +1185,19 @@
       for (const f of fishes) drawFish(f);
     }
 
-    function loop() {
+    function loop(ts) {
+      if (isPaused) {
+        requestAnimationFrame(loop);
+        return;
+      }
+      if (!lastFrameTs) lastFrameTs = ts;
+      const dt = ts - lastFrameTs;
+      if (dt < FRAME_MS) {
+        requestAnimationFrame(loop);
+        return;
+      }
+      lastFrameTs = ts;
+
       update();
       draw();
       requestAnimationFrame(loop);
@@ -1241,6 +1315,10 @@
 
     // ---- Wire UI ----
     function init() {
+      document.addEventListener('visibilitychange', () => {
+        isPaused = document.hidden;
+        if (!isPaused) lastFrameTs = 0;
+      });
       const build = new Date().toISOString().slice(0, 19).replace('T', ' ');
       versionEl.textContent = 'v' + APP_VERSION + ' (' + build + ')';
 
@@ -1273,7 +1351,7 @@
       window.addEventListener('resize', resize);
       resize();
       log('ready');
-      loop();
+      requestAnimationFrame(loop);
     }
 
     init();
