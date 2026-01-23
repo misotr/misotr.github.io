@@ -215,7 +215,7 @@
 
   <script>
     // ---- Version ----
-    const APP_VERSION = '0.3.7';
+    const APP_VERSION = '0.3.8';
 
     // ---- DOM ----
     const canvas = document.getElementById('tank');
@@ -351,8 +351,15 @@
     // ---- Performance knobs ----
     const TARGET_FPS = 30;
     const FRAME_MS = 1000 / TARGET_FPS;
+    const IDLE_FRAME_MS = 500; // when idle, update/draw only twice per second
     let isPaused = false;
     let lastFrameTs = 0;
+    let idleTimer = null;
+
+    // Background cache (offscreen)
+    let DPR = 1;
+    const bgCanvas = document.createElement('canvas');
+    const bgCtx = bgCanvas.getContext('2d');
 
     // Active count UI update: dirty (avoid DOM updates every frame)
     let fishCountDirty = true;
@@ -764,10 +771,16 @@
 
     // ---- Animation / drawing ----
     function resize() {
-      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-      canvas.width = Math.floor(window.innerWidth * dpr);
-      canvas.height = Math.floor(window.innerHeight * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      canvas.width = Math.floor(window.innerWidth * DPR);
+      canvas.height = Math.floor(window.innerHeight * DPR);
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+      // background cache
+      bgCanvas.width = Math.floor(window.innerWidth * DPR);
+      bgCanvas.height = Math.floor(window.innerHeight * DPR);
+      bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      redrawBackground();
 
       // Keep fishes in bounds
       const SAFE_LEFT = safeLeftPx();
@@ -812,12 +825,16 @@
 
         f.activity = Math.max(0, f.activity - 0.0008);
 
+        // Reduce bubble effect load (spawn much less frequently; skip when inactive)
         f.bubbleCooldown--;
         if (f.bubbleCooldown <= 0) {
-          bubbles.push({ x: f.x, y: f.y - f.size, r: 2 + Math.random() * 2, life: 120 });
+          if (f.activity > 0.06) {
+            bubbles.push({ x: f.x, y: f.y - f.size, r: 2 + Math.random() * 2, life: 120 });
+          }
           const base = 70 + Math.random() * 140;
           const boost = (1 - f.activity) * 80;
-          f.bubbleCooldown = base + boost;
+          // 4x slower bubble cadence
+          f.bubbleCooldown = (base + boost) * 4;
         }
       }
 
@@ -833,37 +850,45 @@
       updateActiveCountIfNeeded();
     }
 
-    function drawBackground() {
+    function redrawBackground() {
       const w = window.innerWidth;
       const h = window.innerHeight;
 
       // gradient water
-      const g = ctx.createLinearGradient(0, 0, 0, h);
+      const g = bgCtx.createLinearGradient(0, 0, 0, h);
       g.addColorStop(0, 'rgba(10, 40, 55, 1)');
       g.addColorStop(1, 'rgba(2, 10, 16, 1)');
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, h);
+      bgCtx.fillStyle = g;
+      bgCtx.fillRect(0, 0, w, h);
 
-      // faint light rays
-      ctx.globalAlpha = 0.10;
+      // faint light rays (static)
+      bgCtx.globalAlpha = 0.10;
       for (let i = 0; i < 8; i++) {
         const x = (w * (i + 0.5)) / 8;
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x + 80, h);
-        ctx.lineTo(x - 20, h);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(200, 240, 255, 0.35)';
-        ctx.fill();
+        bgCtx.beginPath();
+        bgCtx.moveTo(x, 0);
+        bgCtx.lineTo(x + 80, h);
+        bgCtx.lineTo(x - 20, h);
+        bgCtx.closePath();
+        bgCtx.fillStyle = 'rgba(200, 240, 255, 0.35)';
+        bgCtx.fill();
       }
-      ctx.globalAlpha = 1;
+      bgCtx.globalAlpha = 1;
 
-      // safe-left visual separator (debug-friendly but subtle)
+      // safe-left visual separator
       const SAFE_LEFT = safeLeftPx();
-      ctx.globalAlpha = 0.08;
-      ctx.fillStyle = 'rgba(220, 250, 255, 1)';
-      ctx.fillRect(SAFE_LEFT, 0, 1, h);
-      ctx.globalAlpha = 1;
+      bgCtx.globalAlpha = 0.08;
+      bgCtx.fillStyle = 'rgba(220, 250, 255, 1)';
+      bgCtx.fillRect(SAFE_LEFT, 0, 1, h);
+      bgCtx.globalAlpha = 1;
+    }
+
+    function drawBackground() {
+      // blit cached background (no recompute per frame)
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(bgCanvas, 0, 0);
+      ctx.restore();
     }
 
     function roundRectPath(ctx, x, y, w, h, r) {
@@ -995,7 +1020,7 @@
       const timeStr = f.latestCreatedAtSec ? timeLabelShort(f.latestCreatedAtSec) : '';
       const headerTextRaw = name + (timeStr ? ('  ' + timeStr) : '');
       const bodyRaw = String(f.latestText || '');
-      const key = headerTextRaw + '¥n' + bodyRaw;
+      const key = `${headerTextRaw}\n${bodyRaw}`;
 
       if (f._bubbleLayout && f._bubbleLayout.key === key) return f._bubbleLayout;
 
@@ -1186,22 +1211,41 @@
       for (const f of fishes) drawFish(f);
     }
 
+    function scheduleNextFrame(idle) {
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+      }
+      if (idle) {
+        idleTimer = setTimeout(() => requestAnimationFrame(loop), IDLE_FRAME_MS);
+      } else {
+        requestAnimationFrame(loop);
+      }
+    }
+
     function loop(ts) {
       if (isPaused) {
-        requestAnimationFrame(loop);
+        scheduleNextFrame(true);
         return;
       }
       if (!lastFrameTs) lastFrameTs = ts;
       const dt = ts - lastFrameTs;
-      if (dt < FRAME_MS) {
-        requestAnimationFrame(loop);
+
+      // When disconnected or no fishes, go idle.
+      const connected = !!(ws && ws.readyState === 1);
+      const idle = (!connected) && fishes.length === 0;
+
+      if (!idle && dt < FRAME_MS) {
+        scheduleNextFrame(false);
         return;
       }
       lastFrameTs = ts;
 
-      update();
+      // In idle mode, we still draw rarely (e.g., UI changes), but skip physics-heavy updates.
+      if (!idle) update();
       draw();
-      requestAnimationFrame(loop);
+
+      scheduleNextFrame(idle);
     }
 
     // ---- Click -> nostter ----
@@ -1318,7 +1362,14 @@
     function init() {
       document.addEventListener('visibilitychange', () => {
         isPaused = document.hidden;
-        if (!isPaused) lastFrameTs = 0;
+        if (isPaused) {
+          if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+        } else {
+          lastFrameTs = 0;
+          // redraw background once when returning (in case of resize/zoom)
+          redrawBackground();
+          scheduleNextFrame(false);
+        }
       });
       const build = new Date().toISOString().slice(0, 19).replace('T', ' ');
       versionEl.textContent = 'v' + APP_VERSION + ' (' + build + ')';
