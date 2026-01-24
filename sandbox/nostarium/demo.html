@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="icon" href="favicon.jpeg">
   <title>Nostarium demo</title>
   <style>
     :root {
@@ -215,7 +214,7 @@
 
   <script>
     // ---- Version ----
-    const APP_VERSION = '0.3.8';
+    const APP_VERSION = '0.3.9';
 
     // ---- DOM ----
     const canvas = document.getElementById('tank');
@@ -373,6 +372,8 @@
 
     // ---- WebSocket ----
     let ws = null;
+    // If user explicitly disconnects, do not auto-reconnect until they press Connect.
+    let userDisconnected = false;
     let subIdPosts = null;
     const activeSubs = new Set();
     let reqSent = 0;
@@ -449,6 +450,7 @@
     }
 
     function connectRelay(url) {
+      userDisconnected = false;
       disconnectRelay();
 
       ACTIVE_WINDOW_SEC = readRangeSec();
@@ -595,7 +597,8 @@
       if (f) return f;
 
       const SAFE_LEFT = safeLeftPx();
-      const w = Math.max(64, canvas.width - SAFE_LEFT);
+      // NOTE: fish coordinates are in CSS pixels (window.innerWidth/Height), not device pixels (canvas.width/height).
+      const w = Math.max(64, window.innerWidth - SAFE_LEFT);
 
       f = {
         pubkey: pk,
@@ -605,7 +608,7 @@
         latestCreatedAtSec: 0,
         lastSeenMs: 0,
         x: SAFE_LEFT + Math.random() * w,
-        y: Math.random() * canvas.height,
+        y: Math.random() * window.innerHeight,
         vx: (Math.random() - 0.5) * 0.7,
         vy: (Math.random() - 0.5) * 0.45,
         size: 10 + Math.random() * 12,
@@ -1020,7 +1023,8 @@
       const timeStr = f.latestCreatedAtSec ? timeLabelShort(f.latestCreatedAtSec) : '';
       const headerTextRaw = name + (timeStr ? ('  ' + timeStr) : '');
       const bodyRaw = String(f.latestText || '');
-      const key = `${headerTextRaw}\n${bodyRaw}`;
+      const key = `${headerTextRaw}
+${bodyRaw}`;
 
       if (f._bubbleLayout && f._bubbleLayout.key === key) return f._bubbleLayout;
 
@@ -1359,6 +1363,15 @@
     }
 
     // ---- Wire UI ----
+    function attemptAutoConnect(reason) {
+      if (userDisconnected) return;
+      const url = (relayInput.value || '').trim();
+      if (!url) return;
+      if (ws && (ws.readyState === 0 || ws.readyState === 1)) return; // already connecting/connected
+      log('AUTO_CONNECT (' + reason + ') ' + url);
+      connectRelay(url);
+    }
+
     function init() {
       document.addEventListener('visibilitychange', () => {
         isPaused = document.hidden;
@@ -1369,6 +1382,7 @@
           // redraw background once when returning (in case of resize/zoom)
           redrawBackground();
           scheduleNextFrame(false);
+          attemptAutoConnect('resume');
         }
       });
       const build = new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -1387,6 +1401,7 @@
       });
 
       btnDisconnect.addEventListener('click', () => {
+        userDisconnected = true;
         disconnectRelay();
       });
 
@@ -1404,6 +1419,9 @@
       resize();
       log('ready');
       requestAnimationFrame(loop);
+
+      // Auto-connect on first load
+      attemptAutoConnect('startup');
     }
 
     init();
