@@ -109,7 +109,7 @@
       <div class="profile-card">
         <strong id="profileName">匿名ユーザー</strong>
         <p class="tiny" id="profilePubkey">未ログイン</p>
-        <p class="tiny">Nostr の kind:1 テキストノートを複数リレーから取得します。投稿には NIP-07 拡張、またはこのブラウザ内で生成した秘密鍵を使います。</p>
+        <p class="tiny">ログイン後、Nostr の kind:3 フォローリストを取得し、フォロー中アカウントの kind:1 テキストノートだけを複数リレーから表示します。</p>
       </div>
       <div class="box">
         <strong>Relays</strong>
@@ -119,7 +119,7 @@
         <button class="ghost" id="addRelayBtn" style="margin-top:8px;">追加</button>
       </div>
       <div class="box tiny">
-        <strong>注意</strong><br />ローカル鍵は localStorage に保存されます。本格運用では NIP-07 拡張または外部署名器を推奨します。
+        <strong>注意</strong><br />ローカル鍵は localStorage に保存されます。本格運用では NIP-07 拡張または外部署名器を推奨します。フォローリストがリレー上で見つからない場合、タイムラインは空になります。
       </div>
     </aside>
   </div>
@@ -141,6 +141,8 @@
       secretHex: localStorage.getItem('mono:secretHex') || null,
       metadata: new Map(),
       events: new Map(),
+      follows: [],
+      followSub: null,
       sub: null
     };
 
@@ -185,6 +187,14 @@
     }
 
     function renderFeed() {
+      if (!state.pubkey) {
+        feed.innerHTML = `<p class="tiny" style="padding:20px;">ログインすると、フォローしている人の投稿だけを表示します。</p>`;
+        return;
+      }
+      if (state.follows.length === 0 && state.events.size === 0) {
+        feed.innerHTML = `<p class="tiny" style="padding:20px;">フォローリストを読み込み中です。フォローがない、または kind:3 がリレー上で見つからない場合は投稿が表示されません。</p>`;
+        return;
+      }
       const notes = [...state.events.values()].sort((a,b) => b.created_at - a.created_at).slice(0, 120);
       feed.innerHTML = notes.map(ev => `
         <article class="note">
@@ -198,7 +208,7 @@
             <div class="content">${linkify(escapeHtml(ev.content))}</div>
             <div class="note-actions"><span>返信</span><span>再投稿</span><span>いいね</span><span>共有</span></div>
           </div>
-        </article>`).join('') || `<p class="tiny" style="padding:20px;">投稿を読み込み中です。</p>`;
+        </article>`).join('') || `<p class="tiny" style="padding:20px;">フォロー中アカウントの投稿を読み込み中です。</p>`;
     }
 
     function escapeHtml(s) {
@@ -256,23 +266,74 @@
       }
     }
 
-    function subscribe() {
+    function stopSubscriptions() {
+      if (state.followSub?.close) state.followSub.close();
       if (state.sub?.close) state.sub.close();
-      $('connectionStatus').textContent = '接続中';
-      const since = Math.floor(Date.now()/1000) - 60 * 60 * 24 * 3;
-      state.sub = state.pool.subscribeMany(state.relays, [
-        { kinds: [1], limit: 80, since },
-        { kinds: [0], limit: 200 }
+      state.followSub = null;
+      state.sub = null;
+    }
+
+    function followPubkeysFromEvent(ev) {
+      return [...new Set(ev.tags
+        .filter(t => t[0] === 'p' && /^[0-9a-f]{64}$/i.test(t[1] || ''))
+        .map(t => t[1].toLowerCase()))];
+    }
+
+    function subscribe() {
+      stopSubscriptions();
+      state.events.clear();
+      state.follows = [];
+      renderFeed();
+      if (!state.pubkey) {
+        $('connectionStatus').textContent = '未接続';
+        return;
+      }
+
+      $('connectionStatus').textContent = 'フォロー取得中';
+      let latestFollowEvent = null;
+      state.followSub = state.pool.subscribeMany(state.relays, [
+        { kinds: [3], authors: [state.pubkey], limit: 1 },
+        { kinds: [0], authors: [state.pubkey], limit: 1 }
       ], {
         onevent(ev) {
-          if (ev.kind === 1 && ev.content) state.events.set(ev.id, ev);
+          if (ev.kind === 0) {
+            try { state.metadata.set(ev.pubkey, JSON.parse(ev.content)); } catch {}
+            renderProfile();
+            return;
+          }
+          if (!latestFollowEvent || ev.created_at > latestFollowEvent.created_at) latestFollowEvent = ev;
+        },
+        oneose() {
+          const follows = latestFollowEvent ? followPubkeysFromEvent(latestFollowEvent) : [];
+          subscribeFollowingTimeline(follows);
+        }
+      });
+    }
+
+    function subscribeFollowingTimeline(follows) {
+      if (state.sub?.close) state.sub.close();
+      state.follows = follows;
+      if (follows.length === 0) {
+        $('connectionStatus').textContent = 'フォロー 0';
+        renderFeed();
+        return;
+      }
+
+      $('connectionStatus').textContent = `フォロー ${follows.length} 読込中`;
+      const since = Math.floor(Date.now()/1000) - 60 * 60 * 24 * 7;
+      state.sub = state.pool.subscribeMany(state.relays, [
+        { kinds: [1], authors: follows, limit: 120, since },
+        { kinds: [0], authors: [state.pubkey, ...follows], limit: follows.length + 1 }
+      ], {
+        onevent(ev) {
+          if (ev.kind === 1 && ev.content && state.follows.includes(ev.pubkey)) state.events.set(ev.id, ev);
           if (ev.kind === 0) {
             try { state.metadata.set(ev.pubkey, JSON.parse(ev.content)); } catch {}
           }
           renderProfile();
           renderFeed();
         },
-        oneose() { $('connectionStatus').textContent = `${state.events.size} notes`; }
+        oneose() { $('connectionStatus').textContent = `フォロー ${state.follows.length} / ${state.events.size} notes`; }
       });
     }
 
@@ -302,7 +363,8 @@
 
     renderRelays();
     renderProfile();
-    subscribe();
+    renderFeed();
+    if (state.pubkey) subscribe();
   </script>
 </body>
 </html>
