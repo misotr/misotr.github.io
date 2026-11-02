@@ -14,8 +14,9 @@
     .error{display:none;color:#ffd6da;background:#4b1820;border:1px solid #7e2c39;border-radius:11px;padding:11px 13px;margin-top:14px}.error.show{display:block}.hidden{display:none!important}
     .progress-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px}.progress-label{font-weight:750}.progress-value{color:var(--muted);font-variant-numeric:tabular-nums}.bar{height:9px;background:#0a0f16;border-radius:99px;overflow:hidden;border:1px solid var(--line)}.bar>div{height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .2s}.statusline{color:var(--muted);font-size:13px;margin-top:9px}
     .result-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px}.metric{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:18px}.metric .k{color:var(--muted);font-size:12px}.metric .v{font-size:clamp(25px,4vw,38px);font-weight:850;letter-spacing:-.03em;margin-top:3px}.metric.primary{border-color:#4d937a}.metric.primary .v{color:var(--accent)}
+    .profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}.profile{display:grid;grid-template-columns:auto 1fr;gap:4px 13px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:14px 16px}.profile-letter{grid-row:1/3;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#24344a;color:var(--accent2);font-weight:850}.profile .display{font-weight:800;font-size:16px;overflow-wrap:anywhere}.profile .username{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
     .meta{display:grid;grid-template-columns:160px 1fr;gap:7px 14px;margin-top:18px;font-size:13px}.meta dt{color:var(--muted)}.meta dd{margin:0;word-break:break-all}details{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}summary{cursor:pointer;font-weight:750}.table-wrap{overflow:auto;margin-top:10px}table{border-collapse:collapse;width:100%;min-width:650px;font-size:13px}th,td{text-align:left;padding:9px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em}.pill{display:inline-block;padding:2px 8px;border-radius:99px;font-weight:750;font-size:11px;background:#273345}.ok{color:var(--accent)}.bad{color:var(--bad)}.warn{color:var(--warn)}code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.foot{color:var(--muted);font-size:12px;margin-top:18px}
-    @media(max-width:700px){main{margin-top:24px}.grid,.result-grid{grid-template-columns:1fr}.full{grid-column:auto}.people-row{grid-template-columns:1fr}.swap-button{justify-self:center;height:auto}.card{padding:17px}.meta{grid-template-columns:1fr}.meta dd{margin-top:-5px;margin-bottom:7px}}
+    @media(max-width:700px){main{margin-top:24px}.grid,.result-grid,.profile-grid{grid-template-columns:1fr}.full{grid-column:auto}.people-row{grid-template-columns:1fr}.swap-button{justify-self:center;height:auto}.card{padding:17px}.meta{grid-template-columns:1fr}.meta dd{margin-top:-5px;margin-bottom:7px}}
   </style>
 </head>
 <body>
@@ -52,13 +53,17 @@ wss://nos.lol</textarea></div>
   </section>
 
   <section id="resultCard" class="card hidden" aria-live="polite">
+    <div class="profile-grid">
+      <div class="profile"><div class="profile-letter">A</div><div id="aDisplayName" class="display">—</div><div id="aUserName" class="username">—</div></div>
+      <div class="profile"><div class="profile-letter">B</div><div id="bDisplayName" class="display">—</div><div id="bUserName" class="username">—</div></div>
+    </div>
     <div class="result-grid">
       <div class="metric primary"><div class="k">Bさんをフォロー</div><div id="matchMetric" class="v">—</div></div>
       <div class="metric"><div class="k">割合</div><div id="ratioMetric" class="v">—</div></div>
       <div class="metric"><div id="totalLabel" class="k">Aさんのフォロー数</div><div id="totalMetric" class="v">—</div></div>
     </div>
     <dl class="meta"><dt>Aの kind 3</dt><dd id="aEventMeta"></dd><dt>取得できたフォローリスト</dt><dd id="coverageMeta"></dd><dt>計算式</dt><dd id="formulaMeta"></dd></dl>
-    <details><summary>リレーの結果</summary><div class="table-wrap"><table><thead><tr><th>リレー</th><th>A取得</th><th>フォロー先取得</th><th>詳細</th></tr></thead><tbody id="relayRows"></tbody></table></div></details>
+    <details><summary>リレーの結果</summary><div class="table-wrap"><table><thead><tr><th>リレー</th><th>プロフィール</th><th>A取得</th><th>フォロー先取得</th><th>詳細</th></tr></thead><tbody id="relayRows"></tbody></table></div></details>
     <details><summary>Bさんをフォローしている公開鍵</summary><div class="table-wrap"><table><thead><tr><th>#</th><th>npub</th><th>kind 3 の日時</th></tr></thead><tbody id="matchRows"></tbody></table></div></details>
     <p id="denominatorNote" class="foot">割合の分母はAさんの最新kind 3に含まれる重複除去後の全フォロー先です。kind 3を取得できなかった相手は「Bをフォローしている」とは数えません。</p>
   </section>
@@ -122,7 +127,7 @@ wss://nos.lol</textarea></div>
     $('progressBar').style.width = `${pct}%`; $('statusline').textContent = detail;
   }
   function ensureActive() { if (state.cancelled) throw new Error('計算を中止しました。'); }
-  function stat(url) { if (!state.relayStats.has(url)) state.relayStats.set(url,{a:'—',b:'—',detail:[]}); return state.relayStats.get(url); }
+  function stat(url) { if (!state.relayStats.has(url)) state.relayStats.set(url,{p:'—',a:'—',b:'—',detail:[]}); return state.relayStats.get(url); }
 
   function queryRelay(url, filters, timeoutMs, stage, onEvent) {
     return new Promise(resolve => {
@@ -161,10 +166,26 @@ wss://nos.lol</textarea></div>
     })));
     ensureActive(); return latest;
   }
+  async function fetchProfiles(relays, authors, timeoutMs, progressBase=0, progressSpan=1) {
+    const latest=new Map(), seen=new Set(), authorSet=new Set(authors); let completed=0;
+    await Promise.all(relays.map(async url=>{
+      ensureActive();
+      await queryRelay(url,[{kinds:[0],authors}],timeoutMs,'p',(ev)=>{
+        if(seen.has(ev?.id))return;
+        try { if(ev&&ev.kind===0&&Number.isInteger(ev.created_at)&&authorSet.has(ev.pubkey)&&verifyEvent(ev)){seen.add(ev.id);latest.set(ev.pubkey,newer(latest.get(ev.pubkey),ev));} else stat(url).detail.push('無効プロフィールを除外'); } catch { stat(url).detail.push('プロフィール検証失敗'); }
+      });
+      completed++; setProgress('AさんとBさんのプロフィールを取得',progressBase+progressSpan*completed/relays.length,1,`${completed} / ${relays.length} 問い合わせ完了`);
+    }));
+    ensureActive(); return latest;
+  }
+  function profileFields(ev) {
+    if(!ev)return {display:'プロフィール未取得',name:'ユーザ名 —'};
+    try {const data=JSON.parse(ev.content);const name=typeof data.name==='string'&&data.name.trim()?data.name.trim():'—';const display=typeof data.display_name==='string'&&data.display_name.trim()?data.display_name.trim():(typeof data.displayName==='string'&&data.displayName.trim()?data.displayName.trim():name);return {display:display==='—'?'表示名 —':display,name:`ユーザ名 ${name==='—'?'—':'@'+name}`};} catch {return {display:'プロフィール形式エラー',name:'ユーザ名 —'};}
+  }
   function badge(value){const cls=value==='完了'?'ok':value==='—'?'':value==='時間切れ'?'warn':'bad';return `<span class="pill ${cls}">${escapeHtml(value)}</span>`}
   function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function formatDate(ts){return new Intl.DateTimeFormat('ja-JP',{dateStyle:'medium',timeStyle:'medium'}).format(new Date(ts*1000));}
-  function renderRelayStats(){ $('relayRows').innerHTML=[...state.relayStats].map(([url,s])=>`<tr><td><code>${escapeHtml(url)}</code></td><td>${badge(s.a)}</td><td>${badge(s.b)}</td><td>${escapeHtml([...new Set(s.detail)].join(' / ')||'—')}</td></tr>`).join(''); }
+  function renderRelayStats(){ $('relayRows').innerHTML=[...state.relayStats].map(([url,s])=>`<tr><td><code>${escapeHtml(url)}</code></td><td>${badge(s.p)}</td><td>${badge(s.a)}</td><td>${badge(s.b)}</td><td>${escapeHtml([...new Set(s.detail)].join(' / ')||'—')}</td></tr>`).join(''); }
 
   async function run(){
     $('error').classList.remove('show'); $('resultCard').classList.add('hidden'); state.cancelled=false; state.relayStats.clear();
@@ -173,17 +194,21 @@ wss://nos.lol</textarea></div>
       const a=decodeNpub($('aNpub').value,'Aさん'), b=decodeNpub($('bNpub').value,'Bさん');
       const relays=parseRelays($('relays').value); const timeoutSec=Math.max(3,Math.min(30,Number($('timeout').value)||8)); const includeFof=$('includeFof').checked;
       if(a===b) throw new Error('AさんとBさんには異なるnpubを指定してください。'); rememberNpubs(a,b); relays.forEach(stat);
-      const aLatest=await fetchLatest(relays,[a],timeoutSec*1000,'a',0,.15); const aEvent=aLatest.get(a);
+      const profiles=await fetchProfiles(relays,[a,b],timeoutSec*1000,0,.1);
+      const aProfile=profileFields(profiles.get(a)), bProfile=profileFields(profiles.get(b));
+      $('aDisplayName').textContent=aProfile.display; $('aUserName').textContent=aProfile.name;
+      $('bDisplayName').textContent=bProfile.display; $('bUserName').textContent=bProfile.name;
+      const aLatest=await fetchLatest(relays,[a],timeoutSec*1000,'a',.1,.15); const aEvent=aLatest.get(a);
       if(!aEvent) throw new Error('Aさんの署名検証済みkind 3フォローリストが見つかりませんでした。リレーを追加して再試行してください。');
       const direct=[...followSet(aEvent)].filter(pk=>pk!==a); if(direct.length>5000) throw new Error(`Aさんのフォロー先が${direct.length.toLocaleString()}件あります。安全のため上限5,000件を超えるリストは処理できません。`);
       let latest=new Map();
-      if(direct.length) latest=await fetchLatest(relays,direct,timeoutSec*1000,'b',.15,includeFof ? .4 : .85); else setProgress('完了',1,1,'Aさんのフォロー先は0件です');
+      if(direct.length) latest=await fetchLatest(relays,direct,timeoutSec*1000,'b',.25,includeFof ? .35 : .75); else setProgress('完了',1,1,'Aさんのフォロー先は0件です');
       const candidates=new Set(direct);
       if(includeFof){
         for(const ev of latest.values()) for(const pk of followSet(ev)) if(pk!==a) candidates.add(pk);
         if(candidates.size>5000) throw new Error(`follow of followを含めた対象が${candidates.size.toLocaleString()}人になりました。安全のため上限5,000人を超える対象は処理できません。`);
         const missing=[...candidates].filter(pk=>!latest.has(pk));
-        if(missing.length){const expanded=await fetchLatest(relays,missing,timeoutSec*1000,'b',.55,.45);for(const [pk,ev] of expanded)latest.set(pk,ev);} else setProgress('完了',1,1,'追加取得は不要です');
+        if(missing.length){const expanded=await fetchLatest(relays,missing,timeoutSec*1000,'b',.6,.4);for(const [pk,ev] of expanded)latest.set(pk,ev);} else setProgress('完了',1,1,'追加取得は不要です');
       }
       const denominator=[...candidates];
       const matches=[]; for(const pk of denominator){const ev=latest.get(pk);if(ev&&followSet(ev).has(b))matches.push({pk,ev});}
@@ -201,7 +226,7 @@ wss://nos.lol</textarea></div>
       $('error').replaceChildren(document.createTextNode(shortReason(e)));
       if(state.relayStats.size){
         const list=document.createElement('ul'); list.style.margin='8px 0 0'; list.style.paddingLeft='20px';
-        for(const [url,s] of state.relayStats){const item=document.createElement('li');item.textContent=`${url}: A取得 ${s.a} / フォロー先取得 ${s.b}${s.detail.length?' — '+[...new Set(s.detail)].join(' / '):''}`;list.append(item);}
+        for(const [url,s] of state.relayStats){const item=document.createElement('li');item.textContent=`${url}: プロフィール ${s.p} / A取得 ${s.a} / フォロー先取得 ${s.b}${s.detail.length?' — '+[...new Set(s.detail)].join(' / '):''}`;list.append(item);}
         $('error').append(list);
       }
       $('error').classList.add('show'); renderRelayStats();
