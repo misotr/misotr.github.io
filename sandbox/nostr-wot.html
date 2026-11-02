@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nostr フォロー信頼度チェッカー</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0a0d12;--panel:#111720;--panel2:#171f2b;--text:#edf3fa;--muted:#92a0b3;--line:#263244;--accent:#73e0b1;--accent2:#88b8ff;--bad:#ff808b;--warn:#ffd479;--radius:16px}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#142239 0,transparent 33%),var(--bg);color:var(--text);font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+    main{width:min(980px,calc(100% - 32px));margin:42px auto 72px}.eyebrow{color:var(--accent);font-weight:750;letter-spacing:.12em;text-transform:uppercase;font-size:12px}h1{font-size:clamp(28px,5vw,46px);line-height:1.15;margin:7px 0 10px;letter-spacing:-.035em}.lead{color:var(--muted);max-width:720px;margin:0 0 28px}
+    .card{background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line);border-radius:var(--radius);padding:22px;box-shadow:0 16px 50px #0005;margin-top:16px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.full{grid-column:1/-1}.people-row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px;align-items:end}.swap-button{height:46px;padding-inline:14px;white-space:nowrap}label{display:block;font-weight:700;margin-bottom:7px}.hint{display:block;color:var(--muted);font-size:12px;font-weight:400;margin-top:2px}
+    input,textarea{width:100%;border:1px solid var(--line);background:#0b1119;color:var(--text);border-radius:11px;padding:12px 13px;font:14px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;outline:none;transition:.15s}input:focus,textarea:focus{border-color:var(--accent2);box-shadow:0 0 0 3px #88b8ff20}textarea{min-height:112px;resize:vertical}
+    .options{display:flex;align-items:end;gap:18px;flex-wrap:wrap}.small-field{width:180px}.check{display:flex;align-items:flex-start;gap:9px;padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:#0b1119;cursor:pointer;font-weight:650}.check input{width:17px;height:17px;margin:3px 0 0;accent-color:var(--accent);flex:0 0 auto}.check span{display:block}.actions{display:flex;gap:10px;align-items:center;margin-top:20px;flex-wrap:wrap}button{appearance:none;border:0;border-radius:11px;padding:12px 18px;font-weight:800;font-size:14px;cursor:pointer;background:var(--accent);color:#082016}button:hover{filter:brightness(1.07)}button:disabled{opacity:.5;cursor:not-allowed}.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+    .error{display:none;color:#ffd6da;background:#4b1820;border:1px solid #7e2c39;border-radius:11px;padding:11px 13px;margin-top:14px}.error.show{display:block}.hidden{display:none!important}
+    .progress-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px}.progress-label{font-weight:750}.progress-value{color:var(--muted);font-variant-numeric:tabular-nums}.bar{height:9px;background:#0a0f16;border-radius:99px;overflow:hidden;border:1px solid var(--line)}.bar>div{height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .2s}.statusline{color:var(--muted);font-size:13px;margin-top:9px}
+    .result-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px}.metric{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:18px}.metric .k{color:var(--muted);font-size:12px}.metric .v{font-size:clamp(25px,4vw,38px);font-weight:850;letter-spacing:-.03em;margin-top:3px}.metric.primary{border-color:#4d937a}.metric.primary .v{color:var(--accent)}
+    .meta{display:grid;grid-template-columns:160px 1fr;gap:7px 14px;margin-top:18px;font-size:13px}.meta dt{color:var(--muted)}.meta dd{margin:0;word-break:break-all}details{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}summary{cursor:pointer;font-weight:750}.table-wrap{overflow:auto;margin-top:10px}table{border-collapse:collapse;width:100%;min-width:650px;font-size:13px}th,td{text-align:left;padding:9px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em}.pill{display:inline-block;padding:2px 8px;border-radius:99px;font-weight:750;font-size:11px;background:#273345}.ok{color:var(--accent)}.bad{color:var(--bad)}.warn{color:var(--warn)}code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.foot{color:var(--muted);font-size:12px;margin-top:18px}
+    @media(max-width:700px){main{margin-top:24px}.grid,.result-grid{grid-template-columns:1fr}.full{grid-column:auto}.people-row{grid-template-columns:1fr}.swap-button{justify-self:center;height:auto}.card{padding:17px}.meta{grid-template-columns:1fr}.meta dd{margin-top:-5px;margin-bottom:7px}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Nostr · kind 3</div>
+  <h1>フォロー信頼度チェッカー</h1>
+  <p class="lead">Aさんのフォロー先のうち、Bさんをフォローしている人を、指定したNostrリレーから取得した最新の署名検証済みフォローリストで数えます。</p>
+
+  <section class="card" aria-labelledby="inputTitle">
+    <div class="grid">
+      <div class="full people-row">
+        <div><label for="aNpub">Aさんの npub <span class="hint">入力履歴から選択できます</span></label><input id="aNpub" list="npubHistory" autocomplete="off" spellcheck="false" placeholder="npub1…"></div>
+        <button id="swap" class="secondary swap-button" type="button" aria-label="AさんとBさんを入れ替える">A ↔ B</button>
+        <div><label for="bNpub">Bさんの npub <span class="hint">入力履歴から選択できます</span></label><input id="bNpub" list="npubHistory" autocomplete="off" spellcheck="false" placeholder="npub1…"></div>
+        <datalist id="npubHistory"></datalist>
+      </div>
+      <div class="full"><label for="relays">リレーURL <span class="hint">1行に1つ、またはカンマ区切り。wss:// のみ。</span></label><textarea id="relays" spellcheck="false">wss://r.kojira.io
+wss://yabu.me
+wss://relay-jp.nostr.wirednet.jp
+wss://relay.damus.io
+wss://nos.lol</textarea></div>
+      <div class="full options">
+        <div class="small-field"><label for="timeout">リレー待ち時間 <span class="hint">3〜30秒</span></label><input id="timeout" type="number" min="3" max="30" value="8"></div>
+        <label class="check" for="includeFof"><input id="includeFof" type="checkbox"><span>follow of follow も分母に含める<span class="hint">Aの直接フォロー先と、そのフォロー先の和集合</span></span></label>
+      </div>
+    </div>
+    <div class="actions"><button id="run">計算する</button><button id="cancel" class="secondary hidden">中止</button></div>
+    <div id="error" class="error" role="alert"></div>
+  </section>
+
+  <section id="progressCard" class="card hidden" aria-live="polite">
+    <div class="progress-head"><span id="progressLabel" class="progress-label">準備中</span><span id="progressValue" class="progress-value">0%</span></div>
+    <div class="bar"><div id="progressBar"></div></div><div id="statusline" class="statusline"></div>
+  </section>
+
+  <section id="resultCard" class="card hidden" aria-live="polite">
+    <div class="result-grid">
+      <div class="metric primary"><div class="k">Bさんをフォロー</div><div id="matchMetric" class="v">—</div></div>
+      <div class="metric"><div class="k">割合</div><div id="ratioMetric" class="v">—</div></div>
+      <div class="metric"><div id="totalLabel" class="k">Aさんのフォロー数</div><div id="totalMetric" class="v">—</div></div>
+    </div>
+    <dl class="meta"><dt>Aの kind 3</dt><dd id="aEventMeta"></dd><dt>取得できたフォローリスト</dt><dd id="coverageMeta"></dd><dt>計算式</dt><dd id="formulaMeta"></dd></dl>
+    <details><summary>リレーの結果</summary><div class="table-wrap"><table><thead><tr><th>リレー</th><th>A取得</th><th>フォロー先取得</th><th>詳細</th></tr></thead><tbody id="relayRows"></tbody></table></div></details>
+    <details><summary>Bさんをフォローしている公開鍵</summary><div class="table-wrap"><table><thead><tr><th>#</th><th>npub</th><th>kind 3 の日時</th></tr></thead><tbody id="matchRows"></tbody></table></div></details>
+    <p id="denominatorNote" class="foot">割合の分母はAさんの最新kind 3に含まれる重複除去後の全フォロー先です。kind 3を取得できなかった相手は「Bをフォローしている」とは数えません。</p>
+  </section>
+</main>
+<script type="module">
+  import { nip19, verifyEvent } from 'https://esm.sh/nostr-tools@2.25.2?bundle';
+
+  const $ = id => document.getElementById(id);
+  const state = { sockets: new Set(), cancelled: false, relayStats: new Map() };
+  const HEX64 = /^[0-9a-f]{64}$/;
+  const HISTORY_KEY = 'nostr-follow-trust.npub-history.v1';
+
+  function loadNpubHistory() {
+    try {
+      const values=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');
+      return Array.isArray(values)?values.filter(v=>typeof v==='string'&&v.startsWith('npub1')).slice(0,20):[];
+    } catch { return []; }
+  }
+  function refreshNpubHistory() {
+    $('npubHistory').replaceChildren(...loadNpubHistory().map(value=>{const option=document.createElement('option');option.value=value;return option;}));
+  }
+  function rememberNpubs(...pubkeys) {
+    try {
+      const added=pubkeys.map(pk=>nip19.npubEncode(pk));
+      const values=[...added,...loadNpubHistory().filter(value=>!added.includes(value))].slice(0,20);
+      localStorage.setItem(HISTORY_KEY,JSON.stringify(values)); refreshNpubHistory();
+    } catch { /* 保存できない設定でも計算は継続する */ }
+  }
+
+  function decodeNpub(value, label) {
+    const clean = value.trim().toLowerCase().replace(/^nostr:/, '');
+    let decoded;
+    try { decoded = nip19.decode(clean); } catch { throw new Error(`${label}のnpubを正しく入力してください。`); }
+    if (decoded.type !== 'npub' || typeof decoded.data !== 'string' || !HEX64.test(decoded.data)) throw new Error(`${label}にはnpubを入力してください。`);
+    return decoded.data;
+  }
+  function parseRelays(value) {
+    const raw = value.split(/[\s,]+/).map(x => x.trim()).filter(Boolean);
+    const result = [];
+    for (const item of raw) {
+      let u; try { u = new URL(item); } catch { throw new Error(`リレーURLが不正です: ${item}`); }
+      if (u.protocol !== 'wss:') throw new Error(`wss:// のリレーだけを指定してください: ${item}`);
+      u.hash = ''; const normalized = u.toString().replace(/\/$/, '');
+      if (!result.includes(normalized)) result.push(normalized);
+    }
+    if (!result.length) throw new Error('リレーURLを1つ以上入力してください。');
+    if (result.length > 12) throw new Error('リレーは最大12個までにしてください。');
+    return result;
+  }
+  const newer = (a,b) => !a || b.created_at > a.created_at || (b.created_at === a.created_at && b.id > a.id) ? b : a;
+  function validKind3(ev, authors) {
+    return ev && ev.kind === 3 && Number.isInteger(ev.created_at) && authors.has(ev.pubkey) && verifyEvent(ev);
+  }
+  function followSet(ev) {
+    return new Set(ev.tags.filter(t => Array.isArray(t) && t[0] === 'p' && typeof t[1] === 'string' && HEX64.test(t[1].toLowerCase())).map(t => t[1].toLowerCase()));
+  }
+  function shortReason(e) { return String(e?.message || e || '不明なエラー').slice(0,180); }
+  function setProgress(label, done, total, detail='') {
+    const pct = total ? Math.round(done / total * 100) : 0;
+    $('progressLabel').textContent = label; $('progressValue').textContent = `${pct}%`;
+    $('progressBar').style.width = `${pct}%`; $('statusline').textContent = detail;
+  }
+  function ensureActive() { if (state.cancelled) throw new Error('計算を中止しました。'); }
+  function stat(url) { if (!state.relayStats.has(url)) state.relayStats.set(url,{a:'—',b:'—',detail:[]}); return state.relayStats.get(url); }
+
+  function queryRelay(url, filters, timeoutMs, stage, onEvent) {
+    return new Promise(resolve => {
+      const subId = `trust-${crypto.randomUUID().slice(0,12)}`; let socket; let settled = false; let count = 0;
+      const finish = (status, detail='') => {
+        if (settled) return; settled = true; clearTimeout(timer);
+        try { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(['CLOSE',subId])); socket?.close(); } catch {}
+        state.sockets.delete(socket); const s=stat(url); s[stage]=status; if(detail)s.detail.push(detail); resolve({status,count});
+      };
+      const timer = setTimeout(() => finish(count ? '時間切れ' : '失敗', `待ち時間 ${timeoutMs/1000}秒`), timeoutMs);
+      try { socket = new WebSocket(url); state.sockets.add(socket); } catch(e) { finish('失敗',shortReason(e)); return; }
+      socket.onopen = () => { try { socket.send(JSON.stringify(['REQ',subId,...filters])); } catch(e) { finish('失敗',shortReason(e)); } };
+      socket.onmessage = message => {
+        try {
+          const data=JSON.parse(message.data); if(!Array.isArray(data))return;
+          if(data[0]==='EVENT' && data[1]===subId){count++;onEvent(data[2],url);}
+          else if(data[0]==='EOSE' && data[1]===subId) finish('完了',`${count}件受信`);
+          else if(data[0]==='CLOSED' && data[1]===subId) finish(count?'完了':'失敗',String(data[2]||'リレーが購読を終了'));
+        } catch(e) { stat(url).detail.push('不正な応答を無視'); }
+      };
+      socket.onerror=()=>finish('失敗','接続エラー'); socket.onclose=()=>finish(count?'完了':'失敗',count?`${count}件受信`:'接続終了');
+    });
+  }
+
+  async function fetchLatest(relays, authors, timeoutMs, stage, progressBase=0, progressSpan=1) {
+    const latest=new Map(), seen=new Set(); const authorSet=new Set(authors);
+    const batches=[]; for(let i=0;i<authors.length;i+=200)batches.push(authors.slice(i,i+200));
+    let completed=0; const total=relays.length*batches.length;
+    await Promise.all(relays.flatMap(url => batches.map(async batch => {
+      ensureActive();
+      await queryRelay(url,[{kinds:[3],authors:batch}],timeoutMs,stage,(ev)=>{
+        if(seen.has(ev?.id))return;
+        try { if(validKind3(ev,authorSet)){seen.add(ev.id);latest.set(ev.pubkey,newer(latest.get(ev.pubkey),ev));} else stat(url).detail.push('無効イベントを除外'); } catch { stat(url).detail.push('検証失敗イベントを除外'); }
+      });
+      completed++; setProgress(stage==='a'?'Aさんのフォローリストを取得':'フォロー先のリストを取得',progressBase+progressSpan*completed/total,1,`${completed} / ${total} 問い合わせ完了`);
+    })));
+    ensureActive(); return latest;
+  }
+  function badge(value){const cls=value==='完了'?'ok':value==='—'?'':value==='時間切れ'?'warn':'bad';return `<span class="pill ${cls}">${escapeHtml(value)}</span>`}
+  function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function formatDate(ts){return new Intl.DateTimeFormat('ja-JP',{dateStyle:'medium',timeStyle:'medium'}).format(new Date(ts*1000));}
+  function renderRelayStats(){ $('relayRows').innerHTML=[...state.relayStats].map(([url,s])=>`<tr><td><code>${escapeHtml(url)}</code></td><td>${badge(s.a)}</td><td>${badge(s.b)}</td><td>${escapeHtml([...new Set(s.detail)].join(' / ')||'—')}</td></tr>`).join(''); }
+
+  async function run(){
+    $('error').classList.remove('show'); $('resultCard').classList.add('hidden'); state.cancelled=false; state.relayStats.clear();
+    $('run').disabled=true; $('swap').disabled=true; $('cancel').classList.remove('hidden'); $('progressCard').classList.remove('hidden'); setProgress('入力を確認',0,1);
+    try {
+      const a=decodeNpub($('aNpub').value,'Aさん'), b=decodeNpub($('bNpub').value,'Bさん');
+      const relays=parseRelays($('relays').value); const timeoutSec=Math.max(3,Math.min(30,Number($('timeout').value)||8)); const includeFof=$('includeFof').checked;
+      if(a===b) throw new Error('AさんとBさんには異なるnpubを指定してください。'); rememberNpubs(a,b); relays.forEach(stat);
+      const aLatest=await fetchLatest(relays,[a],timeoutSec*1000,'a',0,.15); const aEvent=aLatest.get(a);
+      if(!aEvent) throw new Error('Aさんの署名検証済みkind 3フォローリストが見つかりませんでした。リレーを追加して再試行してください。');
+      const direct=[...followSet(aEvent)].filter(pk=>pk!==a); if(direct.length>5000) throw new Error(`Aさんのフォロー先が${direct.length.toLocaleString()}件あります。安全のため上限5,000件を超えるリストは処理できません。`);
+      let latest=new Map();
+      if(direct.length) latest=await fetchLatest(relays,direct,timeoutSec*1000,'b',.15,includeFof ? .4 : .85); else setProgress('完了',1,1,'Aさんのフォロー先は0件です');
+      const candidates=new Set(direct);
+      if(includeFof){
+        for(const ev of latest.values()) for(const pk of followSet(ev)) if(pk!==a) candidates.add(pk);
+        if(candidates.size>5000) throw new Error(`follow of followを含めた対象が${candidates.size.toLocaleString()}人になりました。安全のため上限5,000人を超える対象は処理できません。`);
+        const missing=[...candidates].filter(pk=>!latest.has(pk));
+        if(missing.length){const expanded=await fetchLatest(relays,missing,timeoutSec*1000,'b',.55,.45);for(const [pk,ev] of expanded)latest.set(pk,ev);} else setProgress('完了',1,1,'追加取得は不要です');
+      }
+      const denominator=[...candidates];
+      const matches=[]; for(const pk of denominator){const ev=latest.get(pk);if(ev&&followSet(ev).has(b))matches.push({pk,ev});}
+      const ratio=denominator.length?matches.length/denominator.length*100:0;
+      $('matchMetric').textContent=`${matches.length.toLocaleString()}人`; $('ratioMetric').textContent=`${ratio.toFixed(2)}%`; $('totalMetric').textContent=`${denominator.length.toLocaleString()}人`;
+      $('totalLabel').textContent=includeFof?'分母の対象人数':'Aさんのフォロー数';
+      $('aEventMeta').textContent=`${formatDate(aEvent.created_at)} · ${aEvent.id}`;
+      const covered=denominator.filter(pk=>latest.has(pk)).length;
+      $('coverageMeta').textContent=`${covered.toLocaleString()} / ${denominator.length.toLocaleString()}人（${denominator.length?(covered/denominator.length*100).toFixed(1):'0.0'}%）`;
+      $('formulaMeta').textContent=`${matches.length.toLocaleString()} ÷ ${denominator.length.toLocaleString()} × 100 = ${ratio.toFixed(2)}%`;
+      $('denominatorNote').textContent=includeFof?`割合の分母は、Aさんの直接フォロー先 ${direct.length.toLocaleString()}人と、その人たちのフォロー先を重複除去した和集合です。Aさん本人は除外しています。kind 3を取得できなかった相手は「Bをフォローしている」とは数えません。`:'割合の分母はAさんの最新kind 3に含まれる重複除去後の全フォロー先です。kind 3を取得できなかった相手は「Bをフォローしている」とは数えません。';
+      $('matchRows').innerHTML=matches.length?matches.map((m,i)=>`<tr><td>${i+1}</td><td><code>${escapeHtml(nip19.npubEncode(m.pk))}</code></td><td>${escapeHtml(formatDate(m.ev.created_at))}</td></tr>`).join(''):'<tr><td colspan="3">該当者なし</td></tr>';
+      renderRelayStats(); $('resultCard').classList.remove('hidden'); setProgress('完了',1,1,`${matches.length}人 / ${denominator.length}人`);
+    } catch(e) {
+      $('error').replaceChildren(document.createTextNode(shortReason(e)));
+      if(state.relayStats.size){
+        const list=document.createElement('ul'); list.style.margin='8px 0 0'; list.style.paddingLeft='20px';
+        for(const [url,s] of state.relayStats){const item=document.createElement('li');item.textContent=`${url}: A取得 ${s.a} / フォロー先取得 ${s.b}${s.detail.length?' — '+[...new Set(s.detail)].join(' / '):''}`;list.append(item);}
+        $('error').append(list);
+      }
+      $('error').classList.add('show'); renderRelayStats();
+    }
+    finally { for(const ws of state.sockets){try{ws.close();}catch{}} state.sockets.clear(); $('run').disabled=false; $('swap').disabled=false; $('cancel').classList.add('hidden'); }
+  }
+  $('run').addEventListener('click',run);
+  $('swap').addEventListener('click',()=>{
+    const a=$('aNpub').value; $('aNpub').value=$('bNpub').value; $('bNpub').value=a;
+    $('error').classList.remove('show'); $('resultCard').classList.add('hidden'); $('progressCard').classList.add('hidden');
+  });
+  $('cancel').addEventListener('click',()=>{state.cancelled=true;for(const ws of state.sockets){try{ws.close();}catch{}}$('statusline').textContent='中止しています…';});
+  refreshNpubHistory();
+</script>
+</body>
+</html>
