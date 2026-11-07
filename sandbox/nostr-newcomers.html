@@ -21,7 +21,7 @@
     <label class="option" for="hiraganaOnly"><input id="hiraganaOnly" type="checkbox" checked>プロフィールまたは最新投稿にひらがなを含む候補のみ</label>
     <div class="actions"><button id="run" disabled>おすすめを探す</button><button id="settingsToggle" class="secondary">リレー設定</button></div>
     <div id="settings" class="settings hidden"><div class="settings-grid"><div><label for="relays">固定リレー <span class="hint">1行に1つ。最大4件。</span></label><textarea id="relays" spellcheck="false">wss://r.kojira.io
-wss://yabu.me</textarea></div><div><label for="timeout">応答待ち時間 <span class="hint">3〜30秒</span></label><input id="timeout" type="number" min="3" max="30" value="8"></div><div><label for="requestInterval">問い合わせ間隔 <span class="hint">0〜5000ms</span></label><input id="requestInterval" type="number" min="0" max="5000" step="50" value="300"></div></div></div>
+wss://yabu.me</textarea></div><div><label for="timeout">応答待ち時間 <span class="hint">3〜30秒</span></label><input id="timeout" type="number" min="3" max="30" value="8"></div><div><label for="requestInterval">問い合わせ間隔 <span class="hint">0〜5000ms</span></label><input id="requestInterval" type="number" min="0" max="5000" step="50" value="1000"></div></div></div>
     <div id="error" class="error" role="alert"></div>
   </section>
   <section id="progressCard" class="card hidden" aria-live="polite"><div class="progress-head"><strong id="progressLabel">準備中</strong><span id="progressValue">0%</span><button id="cancel" class="secondary hidden">中止</button></div><div class="bar"><div id="progressBar"></div></div><div id="status" class="status"></div></section>
@@ -36,7 +36,7 @@ wss://yabu.me</textarea></div><div><label for="timeout">応答待ち時間 <span
 <script type="module">
   import { nip19, verifyEvent } from 'https://esm.sh/nostr-tools@2.25.2?bundle';
   const $=id=>document.getElementById(id),HEX64=/^[0-9a-f]{64}$/,HIRAGANA=/[ぁ-ゖゝゞ]/u;
-  const state={sockets:new Set(),cancelled:false,relayStats:new Map(),relayQueues:new Map(),relayTiming:new Map(),pages:0,events:0,pool:new Map(),profiles:new Map(),profileChecked:new Set(),excluded:new Set(),showExcluded:false,oldPostAuthors:new Set(),muted:new Set(),mutedCandidates:new Set(),mutePrivateFailed:false,userPubkey:'',relays:[],timeoutMs:8000,requestIntervalMs:300,excludeBots:true,newcomersOnly:true,hiraganaOnly:true,supporters:new Map(),scanSession:null};
+  const state={sockets:new Set(),cancelled:false,relayStats:new Map(),relayQueues:new Map(),relayTiming:new Map(),pages:0,events:0,pool:new Map(),profiles:new Map(),profileChecked:new Set(),excluded:new Set(),showExcluded:false,oldPostAuthors:new Set(),muted:new Set(),mutedCandidates:new Set(),mutePrivateFailed:false,userPubkey:'',relays:[],timeoutMs:8000,requestIntervalMs:1000,excludeBots:true,newcomersOnly:true,hiraganaOnly:true,supporters:new Map(),scanSession:null};
   const SETTINGS_KEY='nostr-recent-recs.settings.v1',EXCLUDED_KEY_PREFIX='nostr-newcomers.excluded.v1.';
   function parseRelays(v){const out=[];for(const raw of v.split(/[\s,]+/).filter(Boolean)){let u;try{u=new URL(raw);}catch{throw new Error(`リレーURLが不正です: ${raw}`);}if(u.protocol!=='wss:')throw new Error(`wss:// のみ指定できます: ${raw}`);const url=u.toString().replace(/\/$/,'');if(!out.includes(url))out.push(url);}if(!out.length)throw new Error('リレーを1件以上指定してください。');if(out.length>4)throw new Error('リレーは最大4件です。');return out;}
   function readRequestInterval(){return Math.max(0,Math.min(5000,Number($('requestInterval').value||0)));}
