@@ -42,7 +42,7 @@ wss://yabu.me</textarea></div>
       <div class="metric"><div class="k">最高信頼度</div><div id="topMetric" class="v">—</div></div>
     </div>
     <div class="toolbar">
-      <div class="segments" role="group" aria-label="フォロー状態で絞り込み"><button class="active" data-filter="all">全員表示</button><button data-filter="followed">フォロー中のみ</button><button data-filter="unfollowed">未フォローのみ</button></div>
+      <div class="segments" role="group" aria-label="フォロー状態で絞り込み"><button data-filter="all">全員表示</button><button class="active" data-filter="unfollowed">未フォローのみ</button></div>
       <label class="candidate-filter">候補者の投稿期限<select id="candidateWindow"><option value="none">期限なし</option><option value="1m">1か月</option><option value="3m">3か月</option><option value="6m" selected>6か月</option><option value="1y">1年</option><option value="3y">3年</option></select></label><div id="visibleCount" class="count"></div>
     </div>
     <div class="pagination top"><button id="prevPageTop" class="secondary">前の100人</button><span id="pageInfoTop" class="page-info"></span><button id="nextPageTop" class="secondary">次の100人</button></div>
@@ -56,7 +56,7 @@ wss://yabu.me</textarea></div>
 <script type="module">
   import { nip19, verifyEvent } from 'https://esm.sh/nostr-tools@2.25.2?bundle';
   const $=id=>document.getElementById(id), HEX64=/^[0-9a-f]{64}$/;
-  const state={sockets:new Set(),cancelled:false,relayStats:new Map(),deadRelays:new Set(),rows:[],filter:'all',page:1,pageSize:100,profileCache:new Map(),postCache:new Map(),outboxCache:new Map(),candidateFilterStates:new Map(),relays:[],timeoutMs:8000,loadingProfiles:false};
+  const state={sockets:new Set(),cancelled:false,relayStats:new Map(),deadRelays:new Set(),rows:[],filter:'unfollowed',page:1,pageSize:100,profileCache:new Map(),postCache:new Map(),outboxCache:new Map(),candidateFilterStates:new Map(),relays:[],timeoutMs:8000,loadingProfiles:false};
   const HISTORY_KEY='nostr-wot-ranking.npub-history.v1';
   const SETTINGS_KEY='nostr-wot-ranking.settings.v1';
 
@@ -113,11 +113,11 @@ wss://yabu.me</textarea></div>
       let friendEvents=new Map();if(activeDirect.length)friendEvents=await fetchLatestKind(relays,activeDirect,3,timeoutSec*1000,'f','活動中フォロー先のフォローリストを取得',.4,.35);else setProgress('候補者を集計',.75,'活動中のフォロー先は0人です');
       const supporters=new Map();for(const ev of friendEvents.values()){for(const candidate of followSet(ev)){if(candidate===a)continue;supporters.set(candidate,(supporters.get(candidate)||0)+1);}}
       if(supporters.size>50000)throw new Error(`候補者が${supporters.size.toLocaleString()}人になりました。安全のため上限50,000人を超える結果は表示できません。`);
-      const candidateKeys=[...supporters.keys()],directSet=new Set(direct),denominator=activeDirect.length;state.rows=candidateKeys.map(pk=>{const count=supporters.get(pk);return{pk,supporters:count,ratio:denominator?count/denominator*100:0,followed:directSet.has(pk)};}).sort((x,y)=>y.ratio-x.ratio||y.supporters-x.supporters||Number(y.followed)-Number(x.followed)||x.pk.localeCompare(y.pk));state.rows.forEach((r,i)=>r.rank=i+1);state.page=1;state.filter='all';
+      const candidateKeys=[...supporters.keys()],directSet=new Set(direct),denominator=activeDirect.length;state.rows=candidateKeys.map(pk=>{const count=supporters.get(pk);return{pk,supporters:count,ratio:denominator?count/denominator*100:0,followed:directSet.has(pk)};}).sort((x,y)=>y.ratio-x.ratio||y.supporters-x.supporters||Number(y.followed)-Number(x.followed)||x.pk.localeCompare(y.pk));state.rows.forEach((r,i)=>r.rank=i+1);state.page=1;state.filter='unfollowed';
       await ensureCandidatePage(1);const firstPageKeys=filteredRows().slice(0,state.pageSize).map(r=>r.pk);await loadProfiles([a,...firstPageKeys]);await loadPosts(firstPageKeys);
       const aProfile=state.profileCache.get(a)||profile(),aDisplay=aProfile.display||`${nip19.npubEncode(a).slice(0,16)}…`,subjectAvatar=$('subjectAvatar'),subjectFallback=$('subjectFallback');$('subjectName').textContent=aDisplay+(aProfile.name&&aDisplay!==aProfile.name?`（@${aProfile.name}）`:'');subjectFallback.textContent=[...aDisplay][0]||'あ';if(aProfile.picture){subjectAvatar.src=aProfile.picture;subjectAvatar.hidden=false;subjectFallback.hidden=true;subjectAvatar.onerror=()=>{subjectAvatar.hidden=true;subjectFallback.hidden=false;};}else{subjectAvatar.hidden=true;subjectFallback.hidden=false;}$('calculatedAt').textContent=`計算日時: ${new Intl.DateTimeFormat('ja-JP',{dateStyle:'medium',timeStyle:'medium'}).format(new Date())}`;
       $('candidateMetric').textContent=`${state.rows.length.toLocaleString()}人`;$('directLabel').textContent=activity.months===null?'計算対象のフォロー先':`${activity.label}以内に活動`;$('directMetric').textContent=activity.months===null?`${direct.length.toLocaleString()}人`:`${activeDirect.length.toLocaleString()} / ${direct.length.toLocaleString()}人`;$('coverageMetric').textContent=`${friendEvents.size.toLocaleString()} / ${activeDirect.length.toLocaleString()}`;$('topMetric').textContent=state.rows.length?`${state.rows[0].ratio.toFixed(2)}%`:'0.00%';$('formulaNote').textContent=activity.months===null?'WoTスコア ＝ 候補者をフォローしているあなたのフォロー先数 ÷ あなたの全フォロー先数 × 100。投稿日時による除外は行いません。':`WoTスコア ＝ 候補者をフォローしている「直近${activity.label}以内に投稿があるあなたのフォロー先」の人数 ÷ その活動中フォロー先の総数 × 100。期間内の投稿が確認できない人は分母・分子の両方から除外します。`;
-      document.querySelectorAll('[data-filter]').forEach(b=>b.classList.toggle('active',b.dataset.filter==='all'));renderRows();renderRelayStats();$('resultCard').classList.remove('hidden');setProgress('完了',1,`${state.rows.length.toLocaleString()}人を集計しました`);
+      document.querySelectorAll('[data-filter]').forEach(b=>b.classList.toggle('active',b.dataset.filter==='unfollowed'));renderRows();renderRelayStats();$('resultCard').classList.remove('hidden');setProgress('完了',1,`${state.rows.length.toLocaleString()}人を集計しました`);
     }catch(e){$('error').textContent=shortError(e);$('error').classList.add('show');renderRelayStats();}finally{for(const ws of state.sockets){try{ws.close();}catch{}}state.sockets.clear();$('run').disabled=false;$('cancel').classList.add('hidden');}}
   $('run').addEventListener('click',run);
   $('cancel').addEventListener('click',()=>{state.cancelled=true;for(const ws of state.sockets){try{ws.close();}catch{}}$('status').textContent='中止しています…';});
